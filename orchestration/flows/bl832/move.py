@@ -6,7 +6,7 @@ from typing import Mapping
 
 from globus_sdk import TransferClient
 from prefect import flow, task, get_run_logger
-
+from prefect.blocks.system import Secret
 from prefect.client import get_client
 
 from orchestration import scicat
