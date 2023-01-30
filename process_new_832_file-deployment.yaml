@@ -1,0 +1,45 @@
+###
+### A complete description of a Prefect Deployment for flow 'new_832_file_flow'
+###
+name: new_file_832
+description: null
+version: eeed7d097354583b1fc87994d0c5f90f
+# The work queue that will handle this deployment's runs
+work_queue_name: bl832
+tags:
+- bl832
+parameters: {}
+schedule: null
+infra_overrides: {}
+
+###
+### DO NOT EDIT BELOW THIS LINE
+###
+flow_name: new_832_file_flow
+manifest_path: null
+infrastructure:
+  type: process
+  env: {}
+  labels: {}
+  name: null
+  command: null
+  stream_output: true
+  working_dir: null
+  _block_document_id: 90764a6a-392f-46d2-afbb-682659039d34
+  _block_document_name: anonymous-1d40c27d-5309-4ff3-9175-83124ae1cf23
+  _is_anonymous: true
+  block_type_slug: process
+  _block_type_slug: process
+storage: null
+path: /app
+entrypoint: orchestration/flows/bl832/move.py:process_new_832_file
+parameter_openapi_schema:
+  title: Parameters
+  type: object
+  properties:
+    file_path:
+      title: file_path
+      type: string
+  required:
+  - file_path
+  definitions: null

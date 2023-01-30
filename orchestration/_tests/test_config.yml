@@ -1,0 +1,8 @@
+globus:
+    globus_endpoints:
+        test_endpoint:
+            root_path: '/data'
+            uri: 'test.example'
+            username: ${TEST_USERNAME}
+            password: ${TEST_PASSWORD}
+            uuid: '12345'
