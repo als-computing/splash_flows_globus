@@ -110,6 +110,7 @@ def ingest_scicat(config: Config832, relative_path):
 @flow(name="new_832_file_flow")
 async def process_new_832_file(file_path: str):
     logger = get_run_logger()
+    logger.info("starting flow")
     config = Config832()
 
     # paths come in from the app on spot832 as /global/raw/...
@@ -144,6 +145,7 @@ async def process_new_832_file(file_path: str):
         raise
 
     return success
+
 
 @flow(name="test_832_transfers")
 def test_transfers(file_path: str = "/raw/transfer_tests/test.txt"):
