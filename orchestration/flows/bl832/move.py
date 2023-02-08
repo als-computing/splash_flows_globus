@@ -108,7 +108,7 @@ def ingest_scicat(config: Config832, relative_path):
 
 
 @flow(name="new_832_file_flow")
-async def process_new_832_file(file_path: str):
+def process_new_832_file(file_path: str):
     logger = get_run_logger()
     logger.info("starting flow")
     config = Config832()
@@ -134,15 +134,15 @@ async def process_new_832_file(file_path: str):
 
     ingest_scicat(config, relative_path)
 
-    try:
-        async with get_client() as client:
-            flow_run_model = await client.create_flow_run_from_deployment(
-                parameters={"file_path": file_path}, deployment_id=deployment_id, 
-            )
-            logger.info(f"Created flow run {flow_run_model.name}!")
-    except BaseException as err:
-        logger.error(f"{err}")
-        raise
+    # try:
+    #     async with get_client() as client:
+    #         flow_run_model = await client.create_flow_run_from_deployment(
+    #             parameters={"file_path": file_path}, deployment_id=deployment_id, 
+    #         )
+    #         logger.info(f"Created flow run {flow_run_model.name}!")
+    # except BaseException as err:
+    #     logger.error(f"{err}")
+    #     raise err
 
     return success
 
