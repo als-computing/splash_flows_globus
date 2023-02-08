@@ -93,7 +93,6 @@ def ingest_scicat(config: Config832, relative_path):
     # relative path: raw/...
     # ingestor api maps /globa/cfs/cdirs/als/data_mover to /data_mover
     # so we want to prepend /data_mover/8.3.2
-    breakpoint() 
     if relative_path[0] == "/":
         relative_path = relative_path[1:]
     ingest_path = os.path.join("/data_mover/8.3.2", relative_path)
