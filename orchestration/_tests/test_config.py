@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from orchestration.config import read_config
+from ..config import read_config
 
 
 def test_config():

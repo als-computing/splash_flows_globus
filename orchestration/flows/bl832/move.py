@@ -73,6 +73,7 @@ def transfer_data_to_nersc(
 
     return success
 
+
 @task(name="test_scicat")
 def test_scicat(config: Config832):
     logger = get_run_logger()
@@ -143,11 +144,11 @@ def process_new_832_file(file_path: str):
     #     logger.error(f"{err}")
     #     raise err
 
-    return success
+    # return success
 
 
 @flow(name="test_832_transfers")
-def test_transfers(file_path: str = "/raw/transfer_tests/test.txt"):
+def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
     logger = get_run_logger()
     config = Config832()
     test_scicat(config)
@@ -181,5 +182,9 @@ def test_transfers(file_path: str = "/raw/transfer_tests/test.txt"):
 
 
 
-# if __name__ == "__main__":
-#     process("/data/raw/dmcreynolds/test/test.txt")
+if __name__ == "__main__":
+    import sys
+    import dotenv
+
+    dotenv.load_dotenv()
+    process_new_832_file(sys.argv[1])

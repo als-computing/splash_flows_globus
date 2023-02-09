@@ -1,19 +1,16 @@
 ###
 ### A complete description of a Prefect Deployment for flow 'test_832_transfers'
 ###
-name: 832_test_transfer
+name: test_transfers_832
 description: null
-version: eeed7d097354583b1fc87994d0c5f90f
+version: b6fccca8d637a7873c174756959b919a
 # The work queue that will handle this deployment's runs
-work_queue_name: bl832
-tags:
-- bl832
-- test
+work_queue_name: als832
+work_pool_name: null
+work_pool_queue_name: null
+tags: []
 parameters: {}
-schedule:
-  cron: 0 * * * *
-  timezone: UTC
-  day_or: true
+schedule: null
 infra_overrides: {}
 
 ###
@@ -29,14 +26,14 @@ infrastructure:
   command: null
   stream_output: true
   working_dir: null
-  _block_document_id: 25b84689-bd51-4a65-8584-e92358aedd5a
-  _block_document_name: anonymous-3f95e3dc-ed20-412f-82e4-0a25497616e6
+  _block_document_id: 7f239c00-904c-46ac-a6d5-e0c6eafc9a95
+  _block_document_name: anonymous-58c9e77a-f1c3-4a1c-bb59-b555c1d6443e
   _is_anonymous: true
   block_type_slug: process
   _block_type_slug: process
 storage: null
-path: /app
-entrypoint: orchestration/flows/bl832/move.py:test_transfers
+path: /Users/dylan/My Drive/work/als-computing/splash_flows_globus
+entrypoint: orchestration/flows/bl832/move.py:test_transfers_832
 parameter_openapi_schema:
   title: Parameters
   type: object
@@ -44,6 +41,8 @@ parameter_openapi_schema:
     file_path:
       title: file_path
       default: /raw/transfer_tests/test.txt
+      position: 0
       type: string
   required: null
   definitions: null
+timestamp: '2023-02-09T17:43:13.971792+00:00'

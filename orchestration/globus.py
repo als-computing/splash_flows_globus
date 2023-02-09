@@ -17,11 +17,10 @@ from globus_sdk import (
     TransferClient,
     TransferData,
 )
-from globus_sdk.services.transfer.errors import TransferAPIError
+
 from prefect import task, get_run_logger
 
-
-from orchestration.config import get_config
+from .config import get_config
 
 load_dotenv()
 
@@ -42,6 +41,9 @@ class GlobusEndpoint:
     root_path: str
 
     def full_path(self, path_suffix: str):
+        # if path_suffix begins with "/", it will mess up the Path join
+        if path_suffix[0] == "/":
+            path_suffix = path_suffix[1:]
         path = Path(self.root_path) / path_suffix
         return str(path)
 
@@ -133,20 +135,21 @@ def get_files_recursive(tc: TransferClient, endpoint: GlobusEndpoint, path: str,
             files = get_files_recursive(tc, endpoint, path + "/" + obj['name'], files)
     return files
 
+
 @task
 def get_files(tc: TransferClient, endpoint: GlobusEndpoint, path: str, files: List, older_than_days = 14):
     return get_files_recursive(tc, endpoint, path, files, older_than_days)
 
-@task
+
 def get_globus_file_object(tc: TransferClient, endpoint: GlobusEndpoint, file: str):
     p_logger = get_run_logger()
     # get containing directory, we have to do an ls to find a file
     file_path = Path(file)
     p_logger.info(f"root path {endpoint.root_path}")
-    globus_server_path = endpoint.full_path(file_path.parent)
+    globus_server_path = endpoint.full_path(str(file_path.parent))
     p_logger.info(f"globus_server_path  {globus_server_path}")
 
-    files = tc.operation_ls(endpoint.uuid, globus_server_path, p_logger)
+    files = tc.operation_ls(endpoint.uuid, globus_server_path)
     # logger.info(f"files {files}")
         # endpoint_obj = next(obj for obj in files if obj['name'] == file_path.name)
     for file_obj in files:
@@ -154,18 +157,20 @@ def get_globus_file_object(tc: TransferClient, endpoint: GlobusEndpoint, file: s
             return file_obj
     return None
 
+
 @task
 def prune_files(transfer_client: TransferClient, endpoint: GlobusEndpoint, files: List):
     p_logger = get_run_logger()
-    ddata = DeleteData(tc, endpoint.uuid)
-    p_logger.info(f"deleting {len(files)} from endpoint: {endpoint}")
+    ddata = DeleteData(transfer_client, endpoint.uuid)
+    p_logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
     for file in files:
         file_path = endpoint.full_path(file)
         ddata.add_item(file_path)
-    delete_result = tc.submit_delete(ddata)
+    delete_result = transfer_client.submit_delete(ddata)
     task_id = delete_result['task_id']
     task_wait(transfer_client, task_id, p_logger)
     p_logger.info(f'delete_result {delete_result}')
+
 
 def rename(transfer_client: TransferClient, endpoint: GlobusEndpoint, old_file: str, new_file: str):
     rename_result = transfer_client.operation_rename(endpoint.uuid, old_file, new_file)
@@ -193,6 +198,37 @@ def task_wait(transfer_client: TransferClient, task_id: str, wait_seconds=120, l
             transfer_client.cancel_task(task_id)
             raise TransferError(f"Received FILE_NOT_FOUND, cancelling task")
     return True
+
+@task
+def prune_one_safe(
+        file: str,
+        if_older_than_days: int,
+        tranfer_client: TransferClient,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: GlobusEndpoint,
+        logger=logger):
+    """
+        Prunes a single file or directory. Safety means
+        this performs a check to make sure that the asset on the `source_endpoint`
+        is also located at the check_endpoint. If not, raises
+    """
+    # does the file exist at the source endpoint?
+    g_file_obj = get_globus_file_object(tranfer_client, source_endpoint, file)
+    assert g_file_obj is not None, f"file not found {source_endpoint.uri}"
+    logger.info(f"file: {file} found on {source_endpoint.uri}")
+
+    # does the file exist at the check endpoint?
+    g_file_obj = get_globus_file_object(tranfer_client, check_endpoint, file)
+    assert g_file_obj is not None, f"file not found {check_endpoint.uri}"
+    logger.info(f"file: {file} found on {check_endpoint.uri}")
+
+    # is the file older than the days asked for?
+    assert is_globus_file_older(g_file_obj, if_older_than_days), (
+        f"Will not prune, file date {g_file_obj['last_modified']} is "
+        f"newer than {if_older_than_days} days"
+    )
+    logger.info(f"{file}")
+    prune_files(tranfer_client, source_endpoint, [file])
 
 
 if __name__ == "__main__":

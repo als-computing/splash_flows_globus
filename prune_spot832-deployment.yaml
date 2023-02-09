@@ -1,9 +1,9 @@
 ###
-### A complete description of a Prefect Deployment for flow 'new_832_file_flow'
+### A complete description of a Prefect Deployment for flow 'prune_spot832'
 ###
-name: new_file_832
+name: prune_spot832
 description: null
-version: b6fccca8d637a7873c174756959b919a
+version: 61b0fc6645c8fd15a467beb371fa90a5
 # The work queue that will handle this deployment's runs
 work_queue_name: als832
 work_pool_name: null
@@ -16,7 +16,7 @@ infra_overrides: {}
 ###
 ### DO NOT EDIT BELOW THIS LINE
 ###
-flow_name: new_832_file_flow
+flow_name: prune_spot832
 manifest_path: null
 infrastructure:
   type: process
@@ -26,23 +26,28 @@ infrastructure:
   command: null
   stream_output: true
   working_dir: null
-  _block_document_id: c4882f02-462d-46e4-ae42-16431bc548e4
-  _block_document_name: anonymous-995f92fe-23a3-4167-9d23-13f68851afcf
+  _block_document_id: b9e50358-8c26-4efe-a960-71f79f6730cc
+  _block_document_name: anonymous-4d4e2618-8ad7-456c-98b3-98e0537a1ead
   _is_anonymous: true
   block_type_slug: process
   _block_type_slug: process
 storage: null
 path: /Users/dylan/My Drive/work/als-computing/splash_flows_globus
-entrypoint: orchestration/flows/bl832/move.py:process_new_832_file
+entrypoint: orchestration/flows/bl832/prune.py:prune_spot832
 parameter_openapi_schema:
   title: Parameters
   type: object
   properties:
-    file_path:
-      title: file_path
+    file:
+      title: file
       position: 0
       type: string
+    if_older_than_days:
+      title: if_older_than_days
+      position: 1
+      type: integer
   required:
-  - file_path
+  - file
+  - if_older_than_days
   definitions: null
-timestamp: '2023-02-09T17:43:06.371976+00:00'
+timestamp: '2023-02-09T17:43:21.290981+00:00'

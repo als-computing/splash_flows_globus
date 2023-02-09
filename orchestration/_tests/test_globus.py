@@ -9,8 +9,8 @@ from pytest import MonkeyPatch
 
 from globus_sdk import TransferData
 
-from orchestration.config import read_config
-from orchestration.globus import build_endpoints, GlobusEndpoint, is_globus_file_older, start_transfer
+from ..config import read_config
+from ..globus import build_endpoints, GlobusEndpoint, is_globus_file_older, start_transfer
 
 
 @freeze_time("2022-11-16 23:17:43+00:00")
