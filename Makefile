@@ -16,7 +16,7 @@ hello:
 
 build:
 	@echo "TAG " ${TAG}
-	@podman build -t ${TAG} .
+	@podman build -t ${TAG} . --platform=linux/amd64
 	@echo "tagging to: " ${TAG}    ${REGISTRY_TAG}
 	@podman tag ${TAG} ${REGISTRY_TAG}
  
