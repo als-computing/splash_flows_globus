@@ -1,8 +1,8 @@
-import logging
+import asyncio
+import datetime
 import os
-import uuid
 from pathlib import Path
-from typing import Mapping
+import uuid
 
 from globus_sdk import TransferClient
 from prefect import flow, task, get_run_logger
@@ -10,8 +10,9 @@ from prefect.blocks.system import Secret
 from prefect.client import get_client
 
 from orchestration import scicat
-from orchestration.globus import GlobusEndpoint, start_transfer
 from orchestration.flows.bl832.config import Config832
+from orchestration.globus import GlobusEndpoint, start_transfer
+from orchestration.prefect import schedule_prefect_flow
 
 
 API_KEY = os.getenv("API_KEY")
@@ -133,18 +134,12 @@ def process_new_832_file(file_path: str):
     logger.info(f"File successfully transferred from data832 to NERSC {file_path}. Task {task}")
 
     ingest_scicat(config, relative_path)
+    flow_name = f"delete_spot: {Path(file_path).name}"
 
-    # try:
-    #     async with get_client() as client:
-    #         flow_run_model = await client.create_flow_run_from_deployment(
-    #             parameters={"file_path": file_path}, deployment_id=deployment_id, 
-    #         )
-    #         logger.info(f"Created flow run {flow_run_model.name}!")
-    # except BaseException as err:
-    #     logger.error(f"{err}")
-    #     raise err
+    asyncio.run(schedule_prefect_flow.fn('prune_spot832/prune_spot832', flow_name, {"file": relative_path, "if_older_than_days": 1}, datetime.timedelta(minutes=1)))
+    
 
-    # return success
+    return success
 
 
 @flow(name="test_832_transfers")
