@@ -16,25 +16,25 @@ from orchestration.flows.bl832.config import Config832
 logger = logging.getLogger(__name__)
 
 
-@flow
-def prune_one_data832_file(file: str, if_older_than_days: int = 14):
-    logger = get_run_logger()
-    config = Config832()
-    # get data832 object so we can check age
-    data_832_file_obj = get_globus_file_object(config.tc, config.data832, file).result()
-    logger.info(f"file object found on data832")
-    assert data_832_file_obj is not None, "file not found on data832"
-    if not is_globus_file_older(data_832_file_obj, if_older_than_days):
-        logger.info(f"Will not prune, file date {data_832_file_obj['last_modified']} is "
-                    f"newer than {if_older_than_days} days")
-        return
+# @flow
+# def prune_one_data832_file(file: str, if_older_than_days: int = 14):
+#     logger = get_run_logger()
+#     config = Config832()
+#     # get data832 object so we can check age
+#     data_832_file_obj = get_globus_file_object(config.tc, config.data832, file).result()
+#     logger.info(f"file object found on data832")
+#     assert data_832_file_obj is not None, "file not found on data832"
+#     if not is_globus_file_older(data_832_file_obj, if_older_than_days):
+#         logger.info(f"Will not prune, file date {data_832_file_obj['last_modified']} is "
+#                     f"newer than {if_older_than_days} days")
+#         return
     
-    # check that file exists at NERSC
-    nersc_832_file_obj = get_globus_file_object(config.tc, config.nersc, file)
-    logger.info(f"file object found on nersc")
-    assert nersc_832_file_obj is not None, "file not found on nersc" 
+#     # check that file exists at NERSC
+#     nersc_832_file_obj = get_globus_file_object(config.tc, config.nersc, file)
+#     logger.info(f"file object found on nersc")
+#     assert nersc_832_file_obj is not None, "file not found on nersc" 
     
-    prune_files(config.tc, config.data832, [file])
+#     prune_files(config.tc, config.data832, [file])
 
 
 @flow(name="prune_spot832")
@@ -42,6 +42,13 @@ def prune_spot832(file: str, if_older_than_days: int):
     p_logger = get_run_logger()
     config = Config832()
     prune_one_safe(file, if_older_than_days, config.tc, config.spot832, config.data832, p_logger)
+
+
+@flow(name="prune_data832")
+def prune_data832(file: str, if_older_than_days: int):
+    p_logger = get_run_logger()
+    config = Config832()
+    prune_one_safe(file, if_older_than_days, config.tc, config.data832, config.nersc, p_logger)
 
 
 @flow(name="prune_many_data832")

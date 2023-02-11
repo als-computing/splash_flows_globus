@@ -119,27 +119,36 @@ def process_new_832_file(file_path: str):
     # to all 3 systems.
 
     relative_path = file_path.split('/global')[1]
-    success = transfer_spot_to_data(
+    transfer_spot_to_data(
         relative_path,
         config.tc,
         config.spot832,
         config.data832)
     
     logger.info(f"Transferring {file_path} to spot to data")
-    success = transfer_data_to_nersc(
+    transfer_data_to_nersc(
         relative_path,
         config.tc,
         config.data832,
         config.nersc)
     logger.info(f"File successfully transferred from data832 to NERSC {file_path}. Task {task}")
 
-    ingest_scicat(config, relative_path)
+    # ingest_scicat(config, relative_path)
     flow_name = f"delete_spot: {Path(file_path).name}"
 
-    asyncio.run(schedule_prefect_flow.fn('prune_spot832/prune_spot832', flow_name, {"file": relative_path, "if_older_than_days": 1}, datetime.timedelta(minutes=1)))
-    
+    schedule_prefect_flow(
+        'prune_spot832/prune_spot832',
+        flow_name,
+        {"file": relative_path, "if_older_than_days": 7},
+        datetime.timedelta(minutes=1))
 
-    return success
+    # schedule_prefect_flow(
+    #     'prune_spot832/prune_data832',
+    #     flow_name,
+    #     {"file": relative_path, "if_older_than_days": 0},
+    #     datetime.timedelta(minutes=1))
+
+    return
 
 
 @flow(name="test_832_transfers")
