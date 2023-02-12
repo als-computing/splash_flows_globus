@@ -215,12 +215,16 @@ def prune_one_safe(
     assert g_file_obj is not None, f"file not found {check_endpoint.uri}"
     logger.info(f"file: {file} found on {check_endpoint.uri}")
 
-    # is the file older than the days asked for?
-    assert is_globus_file_older(g_file_obj, if_older_than_days), (
-        f"Will not prune, file date {g_file_obj['last_modified']} is "
-        f"newer than {if_older_than_days} days"
-    )
-    logger.info(f"Will prune. File is on the second server and is older than than {if_older_than_days}")
+    if is_globus_file_older > 0:
+        # is the file older than the days asked for?
+        assert is_globus_file_older(g_file_obj, if_older_than_days), (
+            f"Will not prune, file date {g_file_obj['last_modified']} is "
+            f"newer than {if_older_than_days} days"
+        )
+        logger.info(f"Will prune. File is on the second server and is older than than {if_older_than_days}")
+    else:
+        logger.info("Not checking dates, sent if_older_than_days==0")
+    
     prune_files(tranfer_client, source_endpoint, [file], logger)
     logger.info(f"file deleted from: {source_endpoint.uri}")
 
