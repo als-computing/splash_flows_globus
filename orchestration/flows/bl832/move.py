@@ -6,6 +6,7 @@ import uuid
 
 from globus_sdk import TransferClient
 from prefect import flow, task, get_run_logger
+from prefect.blocks.system import JSON
 from prefect.blocks.system import Secret
 from prefect.client import get_client
 
@@ -52,14 +53,14 @@ def transfer_data_to_nersc(
         file_path: str, 
         transfer_client: TransferClient,
         data832: GlobusEndpoint,
-        nersc: GlobusEndpoint):
+        nersc832: GlobusEndpoint):
     logger = get_run_logger()
 
     # if source_file begins with "/", it will mess up os.path.join
     if file_path[0] == "/":
         file_path = file_path[1:]
     source_path = os.path.join(data832.root_path, file_path)
-    dest_path = os.path.join(nersc.root_path, "8.3.2", file_path)
+    dest_path = os.path.join(nersc832.root_path, "8.3.2", file_path)
 
     logger.info(f"Transferring {dest_path} data832 to nersc")
 
@@ -67,7 +68,7 @@ def transfer_data_to_nersc(
         transfer_client,
         data832,
         source_path,
-        nersc,
+        nersc832,
         dest_path,
         wait_seconds=600,
         logger=logger)
@@ -130,23 +131,28 @@ def process_new_832_file(file_path: str):
         relative_path,
         config.tc,
         config.data832,
-        config.nersc)
+        config.nersc832)
     logger.info(f"File successfully transferred from data832 to NERSC {file_path}. Task {task}")
 
-    # ingest_scicat(config, relative_path)
-    flow_name = f"delete_spot: {Path(file_path).name}"
+    ingest_scicat(config, relative_path)
 
+    bl832_settings = JSON.load("bl832-settings").value
+
+    flow_name = f"delete spot832: {Path(file_path).name}"
+    schedule_spot832_delete_days = bl832_settings['delete_spot832_files_after_days']
+    schedule_data832_delete_days = bl832_settings['delete_data832_files_after_days']
     schedule_prefect_flow(
         'prune_spot832/prune_spot832',
         flow_name,
-        {"file": relative_path, "if_older_than_days": 7},
+        {"relative_path": relative_path, "if_older_than_days": schedule_spot832_delete_days},
         datetime.timedelta(minutes=1))
 
-    # schedule_prefect_flow(
-    #     'prune_spot832/prune_data832',
-    #     flow_name,
-    #     {"file": relative_path, "if_older_than_days": 0},
-    #     datetime.timedelta(minutes=1))
+    flow_name = f"delete data832: {Path(file_path).name}"
+    schedule_prefect_flow(
+        'prune_data832/prune_data832',
+        flow_name,
+        {"relative_path": relative_path, "if_older_than_days": schedule_data832_delete_days},
+        datetime.timedelta(minutes=1))
 
     return
 
@@ -181,7 +187,7 @@ def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
         new_file,
         config.tc,
         config.data832,
-        config.nersc)
+        config.nersc832)
     logger.info(f"File successfully transferred from data832 to NERSC {spot832_path}. Task {task}")
 
 

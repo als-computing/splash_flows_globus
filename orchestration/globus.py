@@ -18,8 +18,6 @@ from globus_sdk import (
     TransferData,
 )
 
-from prefect import task, get_run_logger
-
 from .config import get_config
 
 load_dotenv()
@@ -136,18 +134,16 @@ def get_files_recursive(tc: TransferClient, endpoint: GlobusEndpoint, path: str,
     return files
 
 
-@task
 def get_files(tc: TransferClient, endpoint: GlobusEndpoint, path: str, files: List, older_than_days = 14):
     return get_files_recursive(tc, endpoint, path, files, older_than_days)
 
 
 def get_globus_file_object(tc: TransferClient, endpoint: GlobusEndpoint, file: str):
-    p_logger = get_run_logger()
     # get containing directory, we have to do an ls to find a file
     file_path = Path(file)
-    p_logger.info(f"root path {endpoint.root_path}")
+    logger.info(f"root path {endpoint.root_path}")
     globus_server_path = endpoint.full_path(str(file_path.parent))
-    p_logger.info(f"globus_server_path  {globus_server_path}")
+    logger.info(f"globus_server_path  {globus_server_path}")
 
     files = tc.operation_ls(endpoint.uuid, globus_server_path)
     # logger.info(f"files {files}")
@@ -158,18 +154,16 @@ def get_globus_file_object(tc: TransferClient, endpoint: GlobusEndpoint, file: s
     return None
 
 
-@task
-def prune_files(transfer_client: TransferClient, endpoint: GlobusEndpoint, files: List):
-    p_logger = get_run_logger()
+def prune_files(transfer_client: TransferClient, endpoint: GlobusEndpoint, files: List, logger=logger):
     ddata = DeleteData(transfer_client, endpoint.uuid)
-    p_logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
+    logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
     for file in files:
         file_path = endpoint.full_path(file)
         ddata.add_item(file_path)
     delete_result = transfer_client.submit_delete(ddata)
     task_id = delete_result['task_id']
-    task_wait(transfer_client, task_id, p_logger)
-    p_logger.info(f'delete_result {delete_result}')
+    task_wait(transfer_client, task_id, logger)
+    logger.info(f'delete_result {delete_result}')
 
 
 def rename(transfer_client: TransferClient, endpoint: GlobusEndpoint, old_file: str, new_file: str):
@@ -199,7 +193,6 @@ def task_wait(transfer_client: TransferClient, task_id: str, wait_seconds=120, l
             raise TransferError(f"Received FILE_NOT_FOUND, cancelling task")
     return True
 
-@task
 def prune_one_safe(
         file: str,
         if_older_than_days: int,
@@ -227,8 +220,9 @@ def prune_one_safe(
         f"Will not prune, file date {g_file_obj['last_modified']} is "
         f"newer than {if_older_than_days} days"
     )
-    logger.info(f"{file}")
+    logger.info(f"Will prune. File is on the second server and is older than than {if_older_than_days}")
     prune_files(tranfer_client, source_endpoint, [file])
+    logger.info(f"file deleted from: {source_endpoint.uri}")
 
 
 if __name__ == "__main__":

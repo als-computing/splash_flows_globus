@@ -10,8 +10,8 @@ globus:
       uri: data832.lbl.gov
       uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
 
-    nersc:
-      root_path: /global/cfs/cdirs/als/data_mover
+    nersc832:
+      root_path: /global/cfs/cdirs/als/data_mover/8.3.2
       uri: nersc.gov
       uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
 
