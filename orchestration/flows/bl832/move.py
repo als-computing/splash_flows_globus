@@ -60,7 +60,7 @@ def transfer_data_to_nersc(
     if file_path[0] == "/":
         file_path = file_path[1:]
     source_path = os.path.join(data832.root_path, file_path)
-    dest_path = os.path.join(nersc832.root_path, "8.3.2", file_path)
+    dest_path = os.path.join(nersc832.root_path, file_path)
 
     logger.info(f"Transferring {dest_path} data832 to nersc")
 
