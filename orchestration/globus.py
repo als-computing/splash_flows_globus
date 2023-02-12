@@ -162,7 +162,7 @@ def prune_files(transfer_client: TransferClient, endpoint: GlobusEndpoint, files
         ddata.add_item(file_path)
     delete_result = transfer_client.submit_delete(ddata)
     task_id = delete_result['task_id']
-    task_wait(transfer_client, task_id, logger)
+    task_wait(transfer_client, task_id, logger=logger)
     logger.info(f'delete_result {delete_result}')
 
 
@@ -221,7 +221,7 @@ def prune_one_safe(
         f"newer than {if_older_than_days} days"
     )
     logger.info(f"Will prune. File is on the second server and is older than than {if_older_than_days}")
-    prune_files(tranfer_client, source_endpoint, [file])
+    prune_files(tranfer_client, source_endpoint, [file], logger)
     logger.info(f"file deleted from: {source_endpoint.uri}")
 
 
