@@ -146,6 +146,7 @@ def process_new_832_file(file_path: str):
         flow_name,
         {"relative_path": relative_path, "if_older_than_days": 0},
         datetime.timedelta(days=schedule_spot832_delete_days))
+    logger.info(f"Scheduled delete from spot832 at {datetime.timedelta(days=schedule_spot832_delete_days)}")
 
     flow_name = f"delete data832: {Path(file_path).name}"
     schedule_prefect_flow(
@@ -153,7 +154,7 @@ def process_new_832_file(file_path: str):
         flow_name,
         {"relative_path": relative_path, "if_older_than_days": 0},
         datetime.timedelta(days=schedule_data832_delete_days))
-
+    logger.info(f"Scheduled delete from data832 at {datetime.timedelta(days=schedule_data832_delete_days)}")
     return
 
 
