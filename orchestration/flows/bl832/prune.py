@@ -38,23 +38,37 @@ logger = logging.getLogger(__name__)
 
 
 @flow(name="prune_spot832")
-def prune_spot832(relative_path: str, if_older_than_days: int):
+def prune_spot832(relative_path: str):
     p_logger = get_run_logger()
     config = Config832()
     globus_settings = JSON.load("globus-settings").value
     max_wait_seconds = globus_settings['max_wait_seconds']
     p_logger.info(f"Pruning {relative_path} from {config.spot832}")
-    prune_one_safe(relative_path, if_older_than_days, config.tc, config.spot832, config.data832, p_logger, max_wait_seconds=max_wait_seconds)
+    prune_one_safe(
+        relative_path,
+        0,
+        config.tc,
+        config.spot832,
+        config.data832,
+        logger=p_logger,
+        max_wait_seconds=max_wait_seconds)
 
 
 @flow(name="prune_data832")
-def prune_data832(relative_path: str, if_older_than_days: int):
+def prune_data832(relative_path: str):
     p_logger = get_run_logger()
     config = Config832()
     globus_settings = JSON.load("globus-settings").value
     max_wait_seconds = globus_settings['max_wait_seconds']
     p_logger.info(f"Pruning {relative_path} from {config.data832}")
-    prune_one_safe(relative_path, if_older_than_days, config.tc, config.data832, config.nersc832, p_logger, max_wait_seconds=max_wait_seconds)
+    prune_one_safe(
+        relative_path,
+        0,
+        config.tc,
+        config.data832,
+        config.nersc832,
+        logger=p_logger,
+        max_wait_seconds=max_wait_seconds)
 
 
 # @flow(name="prune_many_data832")
@@ -97,4 +111,4 @@ if __name__ == "__main__":
 
     dotenv.load_dotenv()
     # prune_spot832(sys.argv[1], 36)
-    prune_data832(sys.argv[1], 1)
+    prune_data832(sys.argv[1])

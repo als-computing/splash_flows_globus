@@ -147,7 +147,7 @@ def get_globus_file_object(tc: TransferClient, endpoint: GlobusEndpoint, file: s
 
     files = tc.operation_ls(endpoint.uuid, globus_server_path)
     # logger.info(f"files {files}")
-        # endpoint_obj = next(obj for obj in files if obj['name'] == file_path.name)
+    # endpoint_obj = next(obj for obj in files if obj['name'] == file_path.name)
     for file_obj in files:
         if file_obj['name'] == file_path.name:
             return file_obj
@@ -218,7 +218,7 @@ def prune_one_safe(
     assert g_file_obj is not None, f"file not found {check_endpoint.uri}"
     logger.info(f"file: {file} found on {check_endpoint.uri}")
 
-    if is_globus_file_older > 0:
+    if if_older_than_days > 0:
         # is the file older than the days asked for?
         assert is_globus_file_older(g_file_obj, if_older_than_days), (
             f"Will not prune, file date {g_file_obj['last_modified']} is "
@@ -227,8 +227,8 @@ def prune_one_safe(
         logger.info(f"Will prune. File is on the second server and is older than than {if_older_than_days}")
     else:
         logger.info("Not checking dates, sent if_older_than_days==0")
-    
-    prune_files(tranfer_client, source_endpoint, [file], logger, max_wait_seconds)
+
+    prune_files(tranfer_client, source_endpoint, [file], max_wait_seconds=max_wait_seconds, logger=logger )
     logger.info(f"file deleted from: {source_endpoint.uri}")
 
 
