@@ -41,7 +41,7 @@ def transfer_spot_to_data(
         source_path,
         data832,
         dest_path,
-        wait_seconds=600,
+        max_wait_seconds=600,
         logger=logger,
 )
     logger.info(f"spot832 to data832 globus task_id: {task}")
@@ -70,7 +70,7 @@ def transfer_data_to_nersc(
         source_path,
         nersc832,
         dest_path,
-        wait_seconds=600,
+        max_wait_seconds=600,
         logger=logger)
 
     return success

@@ -92,7 +92,7 @@ def start_transfer(
     source_file: str,
     dest_endpoint: GlobusEndpoint,
     dest_path: str,
-    wait_seconds=120,
+    max_wait_seconds=600,
     logger=logger
 ):
     source_path = Path(source_file)
@@ -112,7 +112,7 @@ def start_transfer(
     # if a transfer failed, like for a file not found globus keeps trying for a long time
     # and won't let another be attempted
     task_id = task["task_id"]
-    return task_wait(transfer_client, task_id, wait_seconds=wait_seconds, logger=logger)
+    return task_wait(transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger)
 
 
 def is_globus_file_older(file_obj, older_than_days):
@@ -121,7 +121,7 @@ def is_globus_file_older(file_obj, older_than_days):
     return comparison_time > last_modified 
 
 
-def get_files_recursive(tc: TransferClient, endpoint: GlobusEndpoint, path: str, files: List, older_than_days = 14):
+def get_files_recursive(tc: TransferClient, endpoint: GlobusEndpoint, path: str, files: List, older_than_days=14):
     print(f"{endpoint.uri} {path}")
     contents = tc.operation_ls(endpoint.uuid, endpoint.full_path(path))
     for obj in contents:
@@ -154,7 +154,7 @@ def get_globus_file_object(tc: TransferClient, endpoint: GlobusEndpoint, file: s
     return None
 
 
-def prune_files(transfer_client: TransferClient, endpoint: GlobusEndpoint, files: List, logger=logger):
+def prune_files(transfer_client: TransferClient, endpoint: GlobusEndpoint, files: List, max_wait_seconds=600, logger=logger):
     ddata = DeleteData(transfer_client, endpoint.uuid)
     logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
     for file in files:
@@ -162,7 +162,7 @@ def prune_files(transfer_client: TransferClient, endpoint: GlobusEndpoint, files
         ddata.add_item(file_path)
     delete_result = transfer_client.submit_delete(ddata)
     task_id = delete_result['task_id']
-    task_wait(transfer_client, task_id, logger=logger)
+    task_wait(transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger)
     logger.info(f'delete_result {delete_result}')
 
 
@@ -171,13 +171,14 @@ def rename(transfer_client: TransferClient, endpoint: GlobusEndpoint, old_file: 
     return task_wait(transfer_client, rename_result['task_id'])
 
 
-def task_wait(transfer_client: TransferClient, task_id: str, wait_seconds=120, logger=logger):
+def task_wait(transfer_client: TransferClient, task_id: str, max_wait_seconds=600, logger=logger):
     start = time()
     while not transfer_client.task_wait(task_id, polling_interval=5, timeout=5):
         elapsed = time() - start
-        if elapsed > wait_seconds:
+        if elapsed > max_wait_seconds:
             logger.info(f"done waiting for completion of task ")
-            raise TransferError(f"Configred to wait {wait_seconds}, elapsed is {elapsed}. Last globus transfer nice_status {task['nice_status']}")
+            raise TransferError(f"Configured to wait {max_wait_seconds}, elapsed is {elapsed} "
+                                f"Last globus transfer nice_status {task['nice_status']}. Job may complete in background.")
         task = transfer_client.get_task(task_id)
         logger.info(
             f"waiting for task with task_id {task_id} to complete {task['nice_status']}"
@@ -193,12 +194,14 @@ def task_wait(transfer_client: TransferClient, task_id: str, wait_seconds=120, l
             raise TransferError(f"Received FILE_NOT_FOUND, cancelling task")
     return True
 
+
 def prune_one_safe(
         file: str,
         if_older_than_days: int,
         tranfer_client: TransferClient,
         source_endpoint: GlobusEndpoint,
         check_endpoint: GlobusEndpoint,
+        max_wait_seconds: int = 120,
         logger=logger):
     """
         Prunes a single file or directory. Safety means
@@ -225,7 +228,7 @@ def prune_one_safe(
     else:
         logger.info("Not checking dates, sent if_older_than_days==0")
     
-    prune_files(tranfer_client, source_endpoint, [file], logger)
+    prune_files(tranfer_client, source_endpoint, [file], logger, max_wait_seconds)
     logger.info(f"file deleted from: {source_endpoint.uri}")
 
 

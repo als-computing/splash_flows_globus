@@ -1,13 +1,13 @@
 import logging
 
-from prefect import flow, get_run_logger, task
-
+from prefect import flow, get_run_logger
+from prefect.blocks.system import JSON
 
 from orchestration.globus import (
-    get_files,
-    get_globus_file_object,
-    is_globus_file_older,
-    prune_files,
+    # get_files,
+    # get_globus_file_object,
+    # is_globus_file_older,
+    # prune_files,
     prune_one_safe
 )
 from orchestration.flows.bl832.config import Config832
@@ -41,16 +41,20 @@ logger = logging.getLogger(__name__)
 def prune_spot832(relative_path: str, if_older_than_days: int):
     p_logger = get_run_logger()
     config = Config832()
+    globus_settings = JSON.load("globus-settings").value
+    max_wait_seconds = globus_settings['max_wait_seconds']
     p_logger.info(f"Pruning {relative_path} from {config.spot832}")
-    prune_one_safe(relative_path, if_older_than_days, config.tc, config.spot832, config.data832, p_logger)
+    prune_one_safe(relative_path, if_older_than_days, config.tc, config.spot832, config.data832, p_logger, max_wait_seconds=max_wait_seconds)
 
 
 @flow(name="prune_data832")
 def prune_data832(relative_path: str, if_older_than_days: int):
     p_logger = get_run_logger()
     config = Config832()
+    globus_settings = JSON.load("globus-settings").value
+    max_wait_seconds = globus_settings['max_wait_seconds']
     p_logger.info(f"Pruning {relative_path} from {config.data832}")
-    prune_one_safe(relative_path, if_older_than_days, config.tc, config.data832, config.nersc832, p_logger)
+    prune_one_safe(relative_path, if_older_than_days, config.tc, config.data832, config.nersc832, p_logger, max_wait_seconds=max_wait_seconds)
 
 
 # @flow(name="prune_many_data832")
