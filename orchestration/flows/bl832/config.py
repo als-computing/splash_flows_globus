@@ -8,8 +8,8 @@ class Config832:
         config = globus.get_config()
         self.endpoints = globus.build_endpoints(config)
         self.apps = globus.build_apps(config)
-        self.tc: TransferClient = globus.init_transfer_client(self.apps['als_transfer'])
-        self.spot832 = self.endpoints['spot832']
-        self.data832 = self.endpoints['data832']
-        self.nersc832 = self.endpoints['nersc832']
-        self.scicat = config['scicat']
+        self.tc: TransferClient = globus.init_transfer_client(self.apps["als_transfer"])
+        self.spot832 = self.endpoints["spot832"]
+        self.data832 = self.endpoints["data832"]
+        self.nersc832 = self.endpoints["nersc832"]
+        self.scicat = config["scicat"]
