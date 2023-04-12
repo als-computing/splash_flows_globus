@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 import time
 
@@ -9,17 +8,22 @@ from pytest import MonkeyPatch
 
 from globus_sdk import TransferData
 
-from ..config import read_config
-from ..globus import build_endpoints, GlobusEndpoint, is_globus_file_older, start_transfer
+from orchestration.config import read_config
+from orchestration.globus import (
+    build_endpoints,
+    GlobusEndpoint,
+    is_globus_file_older,
+    start_transfer,
+)
 
 
 @freeze_time("2022-11-16 23:17:43+00:00")
 def test_file_compare():
-        old_file = {"last_modified": "2022-11-01 23:17:43+00:00"}
-        new_file = {"last_modified": "2022-11-03 23:17:43+00:00"}
+    old_file = {"last_modified": "2022-11-01 23:17:43+00:00"}
+    new_file = {"last_modified": "2022-11-03 23:17:43+00:00"}
 
-        assert is_globus_file_older(old_file, 14)
-        assert not is_globus_file_older(new_file, 14)
+    assert is_globus_file_older(old_file, 14)
+    assert not is_globus_file_older(new_file, 14)
 
 
 class MockTransferClient:
@@ -45,7 +49,6 @@ class FailedTransferClient(MockTransferClient):
         return {"task_id": task_id, "status": "FAILED"}
 
 
-
 def test_globus_config():
     config_file = Path(__file__).parent / "test_config.yml"
     with MonkeyPatch.context() as mp:
@@ -62,39 +65,23 @@ def test_globus_config():
 
 def test_succeeded_transfer():
     transfer_client = MockTransferClient()
-    source_endpoint = GlobusEndpoint(
-        "123", "source.magrathea.com", "/root"
-    )
-    dest_endpoint = GlobusEndpoint(
-        "456", "dest.magrathea.com", "/root"
-    )
+    source_endpoint = GlobusEndpoint("123", "source.magrathea.com", "/root")
+    dest_endpoint = GlobusEndpoint("456", "dest.magrathea.com", "/root")
 
     result = start_transfer(
-        transfer_client,
-        source_endpoint,
-        "/42/mice.jpg",
-        dest_endpoint,
-        "/42/mice.jpg"
-        )
+        transfer_client, source_endpoint, "/42/mice.jpg", dest_endpoint, "/42/mice.jpg"
+    )
 
     assert result
 
 
 def test_failed_transfer():
     transfer_client = FailedTransferClient()
-    source_endpoint = GlobusEndpoint(
-        "123", "source.magrathea.com", "/root"
-    )
-    dest_endpoint = GlobusEndpoint(
-        "456", "dest.magrathea.com", "/root"
-    )
+    source_endpoint = GlobusEndpoint("123", "source.magrathea.com", "/root")
+    dest_endpoint = GlobusEndpoint("456", "dest.magrathea.com", "/root")
 
     result = start_transfer(
-        transfer_client,
-        source_endpoint,
-        "/42/mice.jpg",
-        dest_endpoint,
-        "/42/mice.jpg"
+        transfer_client, source_endpoint, "/42/mice.jpg", dest_endpoint, "/42/mice.jpg"
     )
 
     assert result
