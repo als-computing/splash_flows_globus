@@ -38,6 +38,7 @@ class GlobusEndpoint:
     uuid: str
     uri: str
     root_path: str
+    name: str = ""
 
     def full_path(self, path_suffix: str):
         # if path_suffix begins with "/", it will mess up the Path join
@@ -65,6 +66,7 @@ def build_endpoints(config: Dict) -> Dict[str, GlobusEndpoint]:
             endpoint_config.get("uuid"),
             endpoint_config.get("uri"),
             endpoint_config.get("root_path"),
+            endpoint_config.get("name"),
         )
     return all_endpoints
 
@@ -209,11 +211,12 @@ def task_wait(
         elapsed = time() - start
         task = transfer_client.get_task(task_id)
         if elapsed > max_wait_seconds:
-            logger.info("done waiting for completion of task ")
+            logger.info(f"done waiting for completion of task ")
             raise TransferError(
                 f"Configured to wait {max_wait_seconds}, elapsed is {elapsed} "
                 f"Last globus transfer nice_status {task['nice_status']}. Job may complete in background."
             )
+
         logger.info(
             f"waiting for task with task_id {task_id} to complete {task['nice_status']}"
         )
@@ -225,7 +228,7 @@ def task_wait(
 
         if task["nice_status"] in ["FILE_NOT_FOUND"]:
             transfer_client.cancel_task(task_id)
-            raise TransferError("Received FILE_NOT_FOUND, cancelling task")
+            raise TransferError(f"Received FILE_NOT_FOUND, cancelling task")
     return True
 
 
