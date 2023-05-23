@@ -216,7 +216,7 @@ def task_wait(
                 f"Configured to wait {max_wait_seconds}, elapsed is {elapsed} "
                 f"Last globus transfer nice_status {task['nice_status']}. Job may complete in background."
             )
-        task = transfer_client.get_task(task_id)
+
         logger.info(
             f"waiting for task with task_id {task_id} to complete {task['nice_status']}"
         )
