@@ -14,14 +14,15 @@ API_KEY = os.getenv("API_KEY")
 
 @task(name="transfer_to_different_endpoints")
 def transfer_data_to_nersc(
-        file_path: str,
-        transfer_client: TransferClient,
-        source_endpoint: GlobusEndpoint,
-        destination_endpoint: GlobusEndpoint):
+    file_path: str,
+    transfer_client: TransferClient,
+    source_endpoint: GlobusEndpoint,
+    destination_endpoint: GlobusEndpoint,
+):
     logger = get_run_logger()
 
     # Logging the original source paths
-    logger.info(f'Requested relative source path: {file_path}')
+    logger.info(f"Requested relative source path: {file_path}")
 
     # if source_file begins with "/", it will mess up os.path.join
     file_path = file_path[1:] if file_path[0] == "/" else file_path
@@ -29,11 +30,13 @@ def transfer_data_to_nersc(
     dest_path = os.path.join(destination_endpoint.root_path, file_path)
 
     # Logging the full source and destination paths
-    logger.info(f'Full source path at {source_endpoint.name}: {source_path}')
-    logger.info(f'Full destination path at {destination_endpoint.name}: {dest_path}')
+    logger.info(f"Full source path at {source_endpoint.name}: {source_path}")
+    logger.info(f"Full destination path at {destination_endpoint.name}: {dest_path}")
 
     # Start globus transfer
-    logger.info(f"Transferring {source_path} {source_endpoint.name} to {destination_endpoint.name}")
+    logger.info(
+        f"Transferring {source_path} {source_endpoint.name} to {destination_endpoint.name}"
+    )
 
     success = start_transfer(
         transfer_client,
@@ -42,22 +45,24 @@ def transfer_data_to_nersc(
         destination_endpoint,
         dest_path,
         max_wait_seconds=600,
-        logger=logger)
+        logger=logger,
+    )
 
     return success
 
 
 @task(name="transfer_data_within_single_endpoint")
 def transfer_data_within_single_endpoint(
-        source_path: str,
-        dest_path: str,
-        transfer_client: TransferClient,
-        globus_endpoint: GlobusEndpoint):
+    source_path: str,
+    dest_path: str,
+    transfer_client: TransferClient,
+    globus_endpoint: GlobusEndpoint,
+):
     logger = get_run_logger()
 
     # Logging the original source and destination paths
-    logger.info(f'Requested relative source path: {source_path}')
-    logger.info(f'Requested relative destination path: {dest_path}')
+    logger.info(f"Requested relative source path: {source_path}")
+    logger.info(f"Requested relative destination path: {dest_path}")
 
     # Remove the leading "/" in paths in present
     source_path = source_path[1:] if source_path[0] == "/" else source_path
@@ -66,8 +71,8 @@ def transfer_data_within_single_endpoint(
     dest_path = os.path.join(globus_endpoint.root_path, dest_path)
 
     # Logging the full source and destination paths
-    logger.info(f'Full source path at: {source_path}')
-    logger.info(f'Full destination path at: {dest_path}')
+    logger.info(f"Full source path at: {source_path}")
+    logger.info(f"Full destination path at: {dest_path}")
 
     # Start globus transfer
     logger.info(f"Transferring {source_path} to {dest_path} at {globus_endpoint.name}")
@@ -78,7 +83,8 @@ def transfer_data_within_single_endpoint(
         globus_endpoint,
         dest_path,
         max_wait_seconds=600,
-        logger=logger)
+        logger=logger,
+    )
 
     return success
 
@@ -96,11 +102,11 @@ def test_transfers_7012(file_path: str = "datamovement_test/test.txt"):
     print(new_file)
 
     task = transfer_data_within_single_endpoint(
-        file_path,
-        new_file,
-        config.tc,
-        config.nersc7012)
-    logger.info(f"File successfully transferred from {file_path} to {new_file}. Task {task}")
+        file_path, new_file, config.tc, config.nersc7012
+    )
+    logger.info(
+        f"File successfully transferred from {file_path} to {new_file}. Task {task}"
+    )
     return
 
 
@@ -111,7 +117,9 @@ def process_new_file2(file_path: str):
     config = Config7012()
 
     # Transferring data from cosmicDTN to NERSC
-    task = transfer_data_to_nersc(file_path, config.tc, config.data7012, config.nersc7012)
+    task = transfer_data_to_nersc(
+        file_path, config.tc, config.data7012, config.nersc7012
+    )
     logger.info(f"File successfully transferred from cosmicDTN to NERSC. Task {task}")
 
     # Next task is: start ptycho reconstruction ...

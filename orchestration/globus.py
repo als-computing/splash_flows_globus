@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from dateutil import parser
-import dbm
 import logging
 import os
 from pathlib import Path
@@ -39,7 +38,7 @@ class GlobusEndpoint:
     uuid: str
     uri: str
     root_path: str
-    name: str = ''
+    name: str = ""
 
     def full_path(self, path_suffix: str):
         # if path_suffix begins with "/", it will mess up the Path join
@@ -67,7 +66,7 @@ def build_endpoints(config: Dict) -> Dict[str, GlobusEndpoint]:
             endpoint_config.get("uuid"),
             endpoint_config.get("uri"),
             endpoint_config.get("root_path"),
-            endpoint_config.get("name")
+            endpoint_config.get("name"),
         )
     return all_endpoints
 
@@ -97,7 +96,7 @@ def start_transfer(
     dest_endpoint: GlobusEndpoint,
     dest_path: str,
     max_wait_seconds=600,
-    logger=logger
+    logger=logger,
 ):
     source_path = Path(source_file)
     label = source_path.stem
@@ -109,36 +108,52 @@ def start_transfer(
         sync_level="checksum",
     )
     tdata.add_item(source_file, dest_path)
-    logger.info(f"starting transfer {source_endpoint.uri}:{source_file} to {dest_endpoint.uri}:{dest_path}")
+    logger.info(
+        f"starting transfer {source_endpoint.uri}:{source_file} to {dest_endpoint.uri}:{dest_path}"
+    )
 
     task = transfer_client.submit_transfer(tdata)
 
     # if a transfer failed, like for a file not found globus keeps trying for a long time
     # and won't let another be attempted
     task_id = task["task_id"]
-    return task_wait(transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger)
+    return task_wait(
+        transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
+    )
 
 
 def is_globus_file_older(file_obj, older_than_days):
-    last_modified = parser.parse(file_obj['last_modified'])
+    last_modified = parser.parse(file_obj["last_modified"])
     comparison_time = datetime.now(timezone.utc) - timedelta(days=older_than_days)
     return comparison_time > last_modified
 
 
-def get_files_recursive(tc: TransferClient, endpoint: GlobusEndpoint, path: str, files: List, older_than_days=14):
+def get_files_recursive(
+    tc: TransferClient,
+    endpoint: GlobusEndpoint,
+    path: str,
+    files: List,
+    older_than_days=14,
+):
     print(f"{endpoint.uri} {path}")
     contents = tc.operation_ls(endpoint.uuid, endpoint.full_path(path))
     for obj in contents:
-        if obj['type'] == "file":
-            obj['path'] = path
+        if obj["type"] == "file":
+            obj["path"] = path
             if is_globus_file_older(obj, older_than_days):
-                files.append(path + "/" + obj['name'])
-        if obj['type'] == "dir":
-            files = get_files_recursive(tc, endpoint, path + "/" + obj['name'], files)
+                files.append(path + "/" + obj["name"])
+        if obj["type"] == "dir":
+            files = get_files_recursive(tc, endpoint, path + "/" + obj["name"], files)
     return files
 
 
-def get_files(tc: TransferClient, endpoint: GlobusEndpoint, path: str, files: List, older_than_days=14):
+def get_files(
+    tc: TransferClient,
+    endpoint: GlobusEndpoint,
+    path: str,
+    files: List,
+    older_than_days=14,
+):
     return get_files_recursive(tc, endpoint, path, files, older_than_days)
 
 
@@ -153,37 +168,54 @@ def get_globus_file_object(tc: TransferClient, endpoint: GlobusEndpoint, file: s
     # logger.info(f"files {files}")
     # endpoint_obj = next(obj for obj in files if obj['name'] == file_path.name)
     for file_obj in files:
-        if file_obj['name'] == file_path.name:
+        if file_obj["name"] == file_path.name:
             return file_obj
     return None
 
 
-def prune_files(transfer_client: TransferClient, endpoint: GlobusEndpoint, files: List, max_wait_seconds=600, logger=logger):
+def prune_files(
+    transfer_client: TransferClient,
+    endpoint: GlobusEndpoint,
+    files: List,
+    max_wait_seconds=600,
+    logger=logger,
+):
     ddata = DeleteData(transfer_client, endpoint.uuid)
     logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
     for file in files:
         file_path = endpoint.full_path(file)
         ddata.add_item(file_path)
     delete_result = transfer_client.submit_delete(ddata)
-    task_id = delete_result['task_id']
-    task_wait(transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger)
-    logger.info(f'delete_result {delete_result}')
+    task_id = delete_result["task_id"]
+    task_wait(
+        transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
+    )
+    logger.info(f"delete_result {delete_result}")
 
 
-def rename(transfer_client: TransferClient, endpoint: GlobusEndpoint, old_file: str, new_file: str):
+def rename(
+    transfer_client: TransferClient,
+    endpoint: GlobusEndpoint,
+    old_file: str,
+    new_file: str,
+):
     rename_result = transfer_client.operation_rename(endpoint.uuid, old_file, new_file)
-    return task_wait(transfer_client, rename_result['task_id'])
+    return task_wait(transfer_client, rename_result["task_id"])
 
 
-def task_wait(transfer_client: TransferClient, task_id: str, max_wait_seconds=600, logger=logger):
+def task_wait(
+    transfer_client: TransferClient, task_id: str, max_wait_seconds=600, logger=logger
+):
     start = time()
     while not transfer_client.task_wait(task_id, polling_interval=5, timeout=5):
         elapsed = time() - start
         task = transfer_client.get_task(task_id)
         if elapsed > max_wait_seconds:
             logger.info(f"done waiting for completion of task ")
-            raise TransferError(f"Configured to wait {max_wait_seconds}, elapsed is {elapsed} "
-                                f"Last globus transfer nice_status {task['nice_status']}. Job may complete in background.")
+            raise TransferError(
+                f"Configured to wait {max_wait_seconds}, elapsed is {elapsed} "
+                f"Last globus transfer nice_status {task['nice_status']}. Job may complete in background."
+            )
         task = transfer_client.get_task(task_id)
         logger.info(
             f"waiting for task with task_id {task_id} to complete {task['nice_status']}"
@@ -194,24 +226,25 @@ def task_wait(transfer_client: TransferClient, task_id: str, max_wait_seconds=60
         elif task["status"] == "FAILED":
             logger.info(f"globus task failed {task_id}")
 
-        if task['nice_status'] in ['FILE_NOT_FOUND']:
+        if task["nice_status"] in ["FILE_NOT_FOUND"]:
             transfer_client.cancel_task(task_id)
             raise TransferError(f"Received FILE_NOT_FOUND, cancelling task")
     return True
 
 
 def prune_one_safe(
-        file: str,
-        if_older_than_days: int,
-        tranfer_client: TransferClient,
-        source_endpoint: GlobusEndpoint,
-        check_endpoint: GlobusEndpoint,
-        max_wait_seconds: int = 120,
-        logger=logger):
+    file: str,
+    if_older_than_days: int,
+    tranfer_client: TransferClient,
+    source_endpoint: GlobusEndpoint,
+    check_endpoint: GlobusEndpoint,
+    max_wait_seconds: int = 120,
+    logger=logger,
+):
     """
-        Prunes a single file or directory. Safety means
-        this performs a check to make sure that the asset on the `source_endpoint`
-        is also located at the check_endpoint. If not, raises
+    Prunes a single file or directory. Safety means
+    this performs a check to make sure that the asset on the `source_endpoint`
+    is also located at the check_endpoint. If not, raises
     """
     # does the file exist at the source endpoint?
     g_file_obj = get_globus_file_object(tranfer_client, source_endpoint, file)
@@ -229,11 +262,19 @@ def prune_one_safe(
             f"Will not prune, file date {g_file_obj['last_modified']} is "
             f"newer than {if_older_than_days} days"
         )
-        logger.info(f"Will prune. File is on the second server and is older than than {if_older_than_days}")
+        logger.info(
+            f"Will prune. File is on the second server and is older than than {if_older_than_days}"
+        )
     else:
         logger.info("Not checking dates, sent if_older_than_days==0")
 
-    prune_files(tranfer_client, source_endpoint, [file], max_wait_seconds=max_wait_seconds, logger=logger)
+    prune_files(
+        tranfer_client,
+        source_endpoint,
+        [file],
+        max_wait_seconds=max_wait_seconds,
+        logger=logger,
+    )
     logger.info(f"file deleted from: {source_endpoint.uri}")
 
 

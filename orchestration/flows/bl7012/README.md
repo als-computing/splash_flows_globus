@@ -1,5 +1,5 @@
 # Data movement BL7012
-This repo contains functions to initiate Prefect data processing workflows for COSMIC data. The current implemented Prefect workflow enables data movement from a Globus beamline endpoint to the desinated NERSC Globus endpoint. 
+This package contains functions to initiate Prefect data processing workflows for COSMIC data. The current implemented Prefect workflow enables data movement from a Globus beamline endpoint to the desinated NERSC Globus endpoint. 
 
 # Getting start
 Set up a python enviornment as follow:

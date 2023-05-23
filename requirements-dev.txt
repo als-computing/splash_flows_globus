@@ -1,3 +1,4 @@
 pytest
 freezegun
 flake8
+black
