@@ -15,6 +15,18 @@ globus:
       uri: nersc.gov
       uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
 
+    nersc7012:
+      root_path: /global/cfs/cdirs/als/data_mover/7.0.1.2
+      uri: nersc.gov
+      uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
+      name: nersc7012
+
+    data7012:
+      root_path: /
+      uri: hpc.lbl.gov
+      uuid: 639c49be-604f-423c-9c5d-82a53afe1bf1
+      name: data7012
+
   globus_apps:
     als_transfer:
       client_id: ${GLOBUS_CLIENT_ID}
