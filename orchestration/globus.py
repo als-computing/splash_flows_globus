@@ -179,6 +179,7 @@ def task_wait(transfer_client: TransferClient, task_id: str, max_wait_seconds=60
     start = time()
     while not transfer_client.task_wait(task_id, polling_interval=5, timeout=5):
         elapsed = time() - start
+        task = transfer_client.get_task(task_id)
         if elapsed > max_wait_seconds:
             logger.info(f"done waiting for completion of task ")
             raise TransferError(f"Configured to wait {max_wait_seconds}, elapsed is {elapsed} "
