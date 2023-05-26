@@ -35,8 +35,28 @@ prefect deployment build ./orchestration/flows/bl7012/move.py:process_new_file -
 prefect deployment apply process_new_file-deployment.yaml
 ```
 
-# Starting a Prefect workflow
+# Starting a Prefect workflow manually
 Below is the command to start the Prefect workflow:
 ```
 python -m orchestration.flows.bl7012.move <Relative path of file respect to the root_path defined in Globus endpoint>
+```
+
+# Submitting workflow via Prefect API
+An example is shown `example.ipynb` to submit a PREFECT workflow to PREFECT server. 
+
+Once the job is submitted, a workflow agent is needed to work on jobs in queue. A workflow agent can be launched by:
+```
+prefect agent start -q <name-of-work-queue>
+```
+It requires to have the `PREFECT_API_URL` and `PREFECT_API_KEY` stored as an environment variables, such that the agent knows where to get the work queue. Once the agent is launched, the following message indicates where the agent is currently listening to.
+```
+Starting v2.7.9 agent connected to https://.../api...
+
+  ___ ___ ___ ___ ___ ___ _____     _   ___ ___ _  _ _____
+ | _ \ _ \ __| __| __/ __|_   _|   /_\ / __| __| \| |_   _|
+ |  _/   / _|| _|| _| (__  | |    / _ \ (_ | _|| .` | | |
+ |_| |_|_\___|_| |___\___| |_|   /_/ \_\___|___|_|\_| |_|
+
+
+Agent started! Looking for work from queue(s): <name-of-work-queue>...
 ```

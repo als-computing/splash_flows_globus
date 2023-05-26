@@ -111,7 +111,7 @@ def test_transfers_7012(file_path: str = "datamovement_test/test.txt"):
 
 
 @flow(name="process_newfile_7012")
-def process_new_file2(file_path: str):
+def process_new_file(file_path: str):
     logger = get_run_logger()
     logger.info("Starting flow")
     config = Config7012()
@@ -132,7 +132,6 @@ if __name__ == "__main__":
     import os
     import dotenv
 
-    print(os.getenv("GLOBUS_CLIENT_ID"))
     dotenv.load_dotenv()
+    process_new_file(sys.argv[1])
     # test_transfers_7012()
-    process_new_file2(sys.argv[1])
