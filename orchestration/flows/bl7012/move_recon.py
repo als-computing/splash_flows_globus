@@ -105,10 +105,9 @@ def transfer_data_within_single_endpoint(
 #         )
 #     return success
 
-@task(name = 'cdtools_recon_nersc')
-def cdtools_recon_nersc(
-    file_path, n_gpu, **kwargs):
 
+@task(name="cdtools_recon_nersc")
+def cdtools_recon_nersc(file_path, n_gpu, **kwargs):
     config = Config7012()
     logger = get_run_logger()
     logger.info(f"Performing cdtools ptycho reconstruction at nersc")
@@ -123,19 +122,15 @@ def cdtools_recon_nersc(
     return success
 
 
-@task(name = 'ptychocam_recon_nersc')
-def ptychocam_recon_nersc(
-    file_path, n_gpu, **kwargs):
-
+@task(name="ptychocam_recon_nersc")
+def ptychocam_recon_nersc(file_path, n_gpu, **kwargs):
     logger = get_run_logger()
     logger.info(f"Performing ptychocam ptycho reconstruction at nersc")
     success = nersc.ptychocam(
-            os.path.basename(file_path),
-            n_gpu,
-            logger = logger, 
-            **kwargs
-        )
+        os.path.basename(file_path), n_gpu, logger=logger, **kwargs
+    )
     return success
+
 
 @flow(name="test_cosmicDTN_transfers")
 def test_transfers_7012(file_path: str = "datamovement_test/test.txt"):
@@ -174,29 +169,30 @@ def process_new_file_ptycho4(file_path: str):
 
     return task
 
+
 @flow(name="transfer_auto_recon")
 def transfer_auto_recon(
-        file_path: str,
-        do_cdtools=False,
-        run_split_reconstructions=False,
-        n_modes=1,
-        oversampling_factor=2,
-        propagation_distance=50 * 1e-6,
-        simulate_probe_translation=True,
-        n_init_rounds=1,
-        n_init_iter=50,
-        n_final_iter=50,
-        translation_randomization=0,
-        probe_initialization=None,
-        init_background=False,
-        probe_support_radius=None,
-        do_ptychocam=False,
-        n_iter=500,
-        period_illu_refine=0,
-        period_bg_refine=0,
-        use_illu_mask=False,
-        n_gpu = 1
-        ):
+    file_path: str,
+    do_cdtools=False,
+    run_split_reconstructions=False,
+    n_modes=1,
+    oversampling_factor=2,
+    propagation_distance=50 * 1e-6,
+    simulate_probe_translation=True,
+    n_init_rounds=1,
+    n_init_iter=50,
+    n_final_iter=50,
+    translation_randomization=0,
+    probe_initialization=None,
+    init_background=False,
+    probe_support_radius=None,
+    do_ptychocam=False,
+    n_iter=500,
+    period_illu_refine=0,
+    period_bg_refine=0,
+    use_illu_mask=False,
+    n_gpu=1,
+):
     logger = get_run_logger()
     logger.info("Starting flow")
     config = Config7012()
@@ -212,18 +208,18 @@ def transfer_auto_recon(
         task = cdtools_recon_nersc(
             file_path,
             n_gpu,
-            run_split_reconstructions = run_split_reconstructions,
-            n_modes = n_modes,
-            oversampling_factor = oversampling_factor,
-            propagation_distance = propagation_distance,
-            simulate_probe_translation = simulate_probe_translation,
-            n_init_rounds = n_init_rounds,
-            n_init_iter = n_init_iter,
-            n_final_iter = n_final_iter,
-            translation_randomization = translation_randomization,
-            probe_initialization = probe_initialization,
-            init_background = init_background,
-            probe_support_radius = probe_support_radius, 
+            run_split_reconstructions=run_split_reconstructions,
+            n_modes=n_modes,
+            oversampling_factor=oversampling_factor,
+            propagation_distance=propagation_distance,
+            simulate_probe_translation=simulate_probe_translation,
+            n_init_rounds=n_init_rounds,
+            n_init_iter=n_init_iter,
+            n_final_iter=n_final_iter,
+            translation_randomization=translation_randomization,
+            probe_initialization=probe_initialization,
+            init_background=init_background,
+            probe_support_radius=probe_support_radius,
         )
         logger.info(f"Reconstruction returns with status {task}")
 
@@ -231,13 +227,13 @@ def transfer_auto_recon(
         task = ptychocam_recon_nersc(
             file_path,
             n_gpu,
-            n_iter = n_iter,
-            period_illu_refine = period_illu_refine,
-            period_bg_refine = period_bg_refine,
-            use_illu_mask = use_illu_mask,
+            n_iter=n_iter,
+            period_illu_refine=period_illu_refine,
+            period_bg_refine=period_bg_refine,
+            use_illu_mask=use_illu_mask,
         )
         logger.info(f"Reconstruction returns with status {task}")
-    
+
     # logger.info(f"Submitted task id: {task[0]}")
     # logger.info(f"Task status: {task[1]}")
 
@@ -253,9 +249,10 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
 
     # testing nersc-api all for ptychocam
-    cxi_filename = '2023/02/230216/NS_230216033_ccdframes_0_0.cxi'
-    transfer_auto_recon(file_path=cxi_filename, do_cdtools=True, do_ptychocam=False, n_gpu=1)
-
+    cxi_filename = "2023/02/230216/NS_230216033_ccdframes_0_0.cxi"
+    transfer_auto_recon(
+        file_path=cxi_filename, do_cdtools=True, do_ptychocam=False, n_gpu=1
+    )
 
     # test_transfers_7012()
     # process_new_file2(sys.argv[1])

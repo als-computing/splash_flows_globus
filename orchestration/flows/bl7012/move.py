@@ -110,13 +110,8 @@ def test_transfers_7012(file_path: str = "datamovement_test/test.txt"):
     return
 
 
-<<<<<<< HEAD
 @flow(name="process_newfile_7012_ptycho4")
-def process_new_file_ptycho4(file_path: str):
-=======
-@flow(name="process_newfile_7012")
 def process_new_file(file_path: str):
->>>>>>> 369f16cf4e4e4a08593a033a7ed5299245f13277
     logger = get_run_logger()
     logger.info("Starting flow")
     config = Config7012()
