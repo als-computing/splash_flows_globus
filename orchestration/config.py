@@ -5,8 +5,10 @@ import os
 
 import yaml
 
+
 def get_config():
     return read_config(config_file=Path(__file__).parent.parent / "config.yml")
+
 
 def read_config(config_file="config.yml"):
     with open(config_file, "r") as end_file:
