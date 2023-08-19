@@ -8,10 +8,15 @@ from prefect import flow, task, get_run_logger
 from orchestration.flows.bl7012.config import Config7012
 from orchestration.globus import GlobusEndpoint, start_transfer
 
-from acme_data_cleaning import nersc
+# from acme_data_cleaning import nersc
 
 
 API_KEY = os.getenv("API_KEY")
+PATH_CLIENT_ID = os.getenv("PATH_NERSC_ID")
+PATH_PRIV_KEY = os.getenv("PATH_NERSC_PRI_KEY")
+PATH_JOB_SCRIPT = os.getenv("PATH_JOB_SCRIPT")
+PATH_PTYCHOCAM_NERSC = os.getenv("PATH_PTYCHOCAM_NERSC")
+PATH_CDTOOLS_NERSC = os.getenv("PATH_CDTOOLS_NERSC")
 
 
 @task(name="transfer_to_nersc")
@@ -91,44 +96,50 @@ def transfer_data_within_single_endpoint(
     return success
 
 
-# @task(name = 'cdtools_recon_nersc')
-# def cdtools_recon_nersc(
-#     file_path, n_gpu, **kwargs):
-
-#     logger = get_run_logger()
-#     logger.info(f"Performing cdtools ptycho reconstruction at nersc")
-#     success = nersc.cdtools(
-#             os.path.basename(file_path),
-#             n_gpu,
-#             logger = logger,
-#             **kwargs
-#         )
-#     return success
-
-
 @task(name="cdtools_recon_nersc")
-def cdtools_recon_nersc(file_path, n_gpu, **kwargs):
-    config = Config7012()
+def cdtools_recon_nersc(
+    file_path,
+    config,
+    path_job_script,
+    path_cdtools_nersc,
+    n_gpu,
+    **kwargs,
+):
     logger = get_run_logger()
     logger.info(f"Performing cdtools ptycho reconstruction at nersc")
     config.nersc.logger = logger
-    success = config.nersc.cdtools(os.path.basename(file_path), n_gpu, **kwargs)
-    # success = nersc.cdtools(
-    #         os.path.basename(file_path),
-    #         n_gpu,
-    #         logger = logger,
-    #         **kwargs
-    #     )
+    success = config.nersc.cdtools(
+        os.path.basename(file_path),
+        path_job_script,
+        path_cdtools_nersc,
+        n_gpu,
+        **kwargs,
+    )
     return success
 
 
 @task(name="ptychocam_recon_nersc")
-def ptychocam_recon_nersc(file_path, n_gpu, **kwargs):
+def ptychocam_recon_nersc(
+    file_path,
+    config,
+    path_job_script,
+    path_ptychocam_nersc,
+    n_gpu,
+    **kwargs,
+):
     logger = get_run_logger()
     logger.info(f"Performing ptychocam ptycho reconstruction at nersc")
-    success = nersc.ptychocam(
-        os.path.basename(file_path), n_gpu, logger=logger, **kwargs
+    config.nersc.logger = logger
+    success = config.nersc.ptychocam(
+        os.path.basename(file_path),
+        path_job_script,
+        path_ptychocam_nersc,
+        n_gpu,
+        **kwargs,
     )
+    # success = nersc.ptychocam(
+    #     os.path.basename(file_path), n_gpu, logger=logger, **kwargs
+    # )
     return success
 
 
@@ -195,7 +206,10 @@ def transfer_auto_recon(
 ):
     logger = get_run_logger()
     logger.info("Starting flow")
-    config = Config7012()
+    config = Config7012(
+        PATH_CLIENT_ID,
+        PATH_PRIV_KEY,
+    )
 
     # Transferring data from cosmicDTN to NERSC
     task = transfer_data_to_nersc(
@@ -207,6 +221,9 @@ def transfer_auto_recon(
     if do_cdtools:
         task = cdtools_recon_nersc(
             file_path,
+            config,
+            PATH_JOB_SCRIPT,
+            PATH_CDTOOLS_NERSC,
             n_gpu,
             run_split_reconstructions=run_split_reconstructions,
             n_modes=n_modes,
@@ -226,6 +243,9 @@ def transfer_auto_recon(
     if do_ptychocam:
         task = ptychocam_recon_nersc(
             file_path,
+            config,
+            PATH_JOB_SCRIPT,
+            PATH_PTYCHOCAM_NERSC,
             n_gpu,
             n_iter=n_iter,
             period_illu_refine=period_illu_refine,
@@ -251,7 +271,10 @@ if __name__ == "__main__":
     # testing nersc-api all for ptychocam
     cxi_filename = "2023/02/230216/NS_230216033_ccdframes_0_0.cxi"
     transfer_auto_recon(
-        file_path=cxi_filename, do_cdtools=True, do_ptychocam=False, n_gpu=1
+        cxi_filename,
+        do_cdtools=True,
+        do_ptychocam=False,
+        n_gpu=1,
     )
 
     # test_transfers_7012()

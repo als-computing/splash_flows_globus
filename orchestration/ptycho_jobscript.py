@@ -1,17 +1,6 @@
-import os
+import os, dotenv
 from datetime import datetime
 from collections import OrderedDict
-
-default_path_client_id = "/global/software/ptycholive-dev/nersc_api_keys/clientid.txt"
-default_path_private_key = "/global/software/ptycholive-dev/nersc_api_keys/priv_key.pem"
-default_path_job_script = "/global/software/ptycholive-dev/ACME_Data_Cleaning_And_Assembly/src/acme_data_cleaning/nersc_job_script"
-default_path_ptychocam_nersc = (
-    "~/cosmic_reconstruction_at_nersc/c_ptychocam/ptychocam_reconstruction.sh"
-)
-default_path_cdtools_nersc = (
-    "~/cosmic_reconstruction_at_nersc/c_cdtools/cdtools_reconstruction.sh"
-)
-
 
 cdtools_parms = OrderedDict(
     {
@@ -40,10 +29,10 @@ ptychocam_parms = OrderedDict(
 )
 
 
-def create_job_script(n_gpu, args, time=4, nodes=1):
+def create_job_script(path_job_script, n_gpu, args, time=4, nodes=1):
     now = datetime.now()
     time_str = now.strftime("%Y-%m-%d %H:%M:%S")
-    jobpath = os.path.join(default_path_job_script, "%s.txt" % time_str)
+    jobpath = os.path.join(path_job_script, "%s.txt" % time_str)
     with open(jobpath, "w") as f:
         f.write("#!/bin/bash\n")
         f.write("#SBATCH --constraint=gpu\n")
@@ -56,8 +45,8 @@ def create_job_script(n_gpu, args, time=4, nodes=1):
     return jobpath
 
 
-def get_job_script(n_gpu, args):
-    job_path = create_job_script(n_gpu, args)
+def get_job_script(path_job_script, n_gpu, args):
+    job_path = create_job_script(path_job_script, n_gpu, args)
     with open(job_path, "r") as f:
         job_string = f.read()
     return job_string
