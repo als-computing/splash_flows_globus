@@ -40,9 +40,7 @@ jobs:
       IMAGE_NAME: ${{ github.repository }}
     name: Build webservice docker image and publish to ghrc.io
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    permissions: write-all
 
     steps:
       - name: Checkout repository
