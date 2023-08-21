@@ -1,4 +1,4 @@
-import os, dotenv
+import os
 from datetime import datetime
 from collections import OrderedDict
 

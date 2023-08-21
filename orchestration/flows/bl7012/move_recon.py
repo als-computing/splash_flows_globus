@@ -106,7 +106,7 @@ def cdtools_recon_nersc(
     **kwargs,
 ):
     logger = get_run_logger()
-    logger.info(f"Performing cdtools ptycho reconstruction at nersc")
+    logger.info("Performing cdtools ptycho reconstruction at nersc")
     config.nersc.logger = logger
     success = config.nersc.cdtools(
         os.path.basename(file_path),
@@ -128,7 +128,7 @@ def ptychocam_recon_nersc(
     **kwargs,
 ):
     logger = get_run_logger()
-    logger.info(f"Performing ptychocam ptycho reconstruction at nersc")
+    logger.info("Performing ptychocam ptycho reconstruction at nersc")
     config.nersc.logger = logger
     success = config.nersc.ptychocam(
         os.path.basename(file_path),
@@ -261,7 +261,6 @@ def transfer_auto_recon(
 
 
 if __name__ == "__main__":
-    import sys
     import os
     import dotenv
 
