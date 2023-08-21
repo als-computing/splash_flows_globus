@@ -132,6 +132,7 @@ def ptychocam_recon_nersc(
     logger.info("Performing ptychocam ptycho reconstruction at nersc")
     config.nersc.logger = logger
     success = nersc_ptychocam(
+        config.nersc,
         os.path.basename(file_path),
         path_job_script,
         path_ptychocam_nersc,
