@@ -1,6 +1,12 @@
 import os
 from datetime import datetime
 from collections import OrderedDict
+import logging
+
+from nersc import NerscClient
+
+
+logger = logging.getLogger("data_mover.ptycho_jobscript")
 
 cdtools_parms = OrderedDict(
     {
@@ -85,3 +91,28 @@ def ptychocam_args_string(cxiname, path_sh, orderParm, **kwargs):
     args_string = f"{path_sh} {args}"
 
     return args_string
+
+
+def nserc_cdtools(nersc_client: NerscClient, cxiname, path_job_script, path_cdtools_nersc, n_gpu, **kwargs):
+    args_string = cdtool_args_string(
+        cxiname, path_cdtools_nersc, cdtools_parms, **kwargs
+    )
+    job_script = get_job_script(path_job_script, n_gpu, args_string)
+    logger.info(f"Job script: {job_script}")
+
+    nersc_client.submit_job(job_script)
+    nersc_client.task_wait()
+
+
+def nersc_ptychocam(
+    nersc_client: NerscClient, cxiname, path_job_script, path_ptychocam_nersc, n_gpu, **kwargs
+):
+    args_string = ptychocam_args_string(
+        cxiname, path_ptychocam_nersc, ptychocam_parms, **kwargs
+    )
+    job_script = get_job_script(path_job_script, n_gpu, args_string)
+
+    ßlogger.info(f"Job script: {job_script}")
+
+    nersc_client.submit_job(job_script)
+    nersc_client.task_wait()
