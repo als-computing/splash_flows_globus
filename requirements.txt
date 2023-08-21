@@ -3,3 +3,4 @@ httpx>=0.22.0
 python-dotenv
 prefect==2.7.9
 pyyaml
+authlib
