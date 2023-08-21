@@ -8,7 +8,7 @@ from prefect import flow, task, get_run_logger
 from orchestration.flows.bl7012.config import Config7012
 from orchestration.globus import GlobusEndpoint, start_transfer
 
-# from acme_data_cleaning import nersc
+from .ptycho_jobscript import nserc_cdtools, nersc_ptychocam
 
 
 API_KEY = os.getenv("API_KEY")
@@ -106,9 +106,10 @@ def cdtools_recon_nersc(
     **kwargs,
 ):
     logger = get_run_logger()
-    logger.info(f"Performing cdtools ptycho reconstruction at nersc")
+    logger.info("Performing cdtools ptycho reconstruction at nersc")
     config.nersc.logger = logger
-    success = config.nersc.cdtools(
+    success = nserc_cdtools(
+        config.nersc,
         os.path.basename(file_path),
         path_job_script,
         path_cdtools_nersc,
@@ -128,9 +129,10 @@ def ptychocam_recon_nersc(
     **kwargs,
 ):
     logger = get_run_logger()
-    logger.info(f"Performing ptychocam ptycho reconstruction at nersc")
+    logger.info("Performing ptychocam ptycho reconstruction at nersc")
     config.nersc.logger = logger
-    success = config.nersc.ptychocam(
+    success = nersc_ptychocam(
+        config.nersc,
         os.path.basename(file_path),
         path_job_script,
         path_ptychocam_nersc,
@@ -261,7 +263,6 @@ def transfer_auto_recon(
 
 
 if __name__ == "__main__":
-    import sys
     import os
     import dotenv
 
