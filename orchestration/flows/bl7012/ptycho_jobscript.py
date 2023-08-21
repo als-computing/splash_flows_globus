@@ -112,7 +112,7 @@ def nersc_ptychocam(
     )
     job_script = get_job_script(path_job_script, n_gpu, args_string)
 
-    ßlogger.info(f"Job script: {job_script}")
+    logger.info(f"Job script: {job_script}")
 
     nersc_client.submit_job(job_script)
     nersc_client.task_wait()
