@@ -119,8 +119,8 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
     in case the desired behavior changes in the future.
 
     :param file_path: path to file on spot832
-    :param is_export_control: if True, do not send to NERSC or ingest into SciCat
-    :param send_to_nersc: if True, send to NERSC or ingest into SciCat
+    :param is_export_control: if True, do not send to NERSC ingest into SciCat
+    :param send_to_nersc: if True, send to NERSC and ingest into SciCat
     """
 
     logger = get_run_logger()
