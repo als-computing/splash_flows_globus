@@ -105,7 +105,24 @@ def ingest_scicat(config: Config832, relative_path):
 
 
 @flow(name="new_832_file_flow")
-def process_new_832_file(file_path: str):
+def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=True):
+    """
+    Sends a file along a path:
+        - Copy from spot832 to data832
+        - Copy from data832 to NERSC
+        - Ingest into SciCat
+        - Schedule a job to delete from spot832 in the future
+        - Schedule a job to delete from data832 in the future
+
+    The is_export_control and send_to_nersc flags are functionally identical, but
+    they are separate options at the beamlines, so we leave them as separate parameters
+    in case the desired behavior changes in the future.
+
+    :param file_path: path to file on spot832
+    :param is_export_control: if True, do not send to NERSC ingest into SciCat
+    :param send_to_nersc: if True, send to NERSC and ingest into SciCat
+    """
+
     logger = get_run_logger()
     logger.info("starting flow")
     config = Config832()
@@ -113,17 +130,20 @@ def process_new_832_file(file_path: str):
     # paths come in from the app on spot832 as /global/raw/...
     # remove 'global' so that all paths start with 'raw', which is common
     # to all 3 systems.
-
+    logger.info(f"Transferring {file_path} from spot to data")
     relative_path = file_path.split("/global")[1]
     transfer_spot_to_data(relative_path, config.tc, config.spot832, config.data832)
 
     logger.info(f"Transferring {file_path} to spot to data")
-    transfer_data_to_nersc(relative_path, config.tc, config.data832, config.nersc832)
-    logger.info(
-        f"File successfully transferred from data832 to NERSC {file_path}. Task {task}"
-    )
 
-    ingest_scicat(config, relative_path)
+    if not is_export_control and send_to_nersc:
+        transfer_data_to_nersc(
+            relative_path, config.tc, config.data832, config.nersc832
+        )
+        logger.info(
+            f"File successfully transferred from data832 to NERSC {file_path}. Task {task}"
+        )
+        ingest_scicat(config, relative_path)
 
     bl832_settings = JSON.load("bl832-settings").value
 

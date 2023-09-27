@@ -1,6 +1,10 @@
+import json
+import logging
+import time
+
 from authlib.integrations.requests_client import OAuth2Session
 from authlib.oauth2.rfc7523 import PrivateKeyJWT
-import time, json, os, logging
+
 from orchestration.ptycho_jobscript import (
     get_job_script,
     cdtool_args_string,
@@ -145,11 +149,11 @@ class NerscClient:
             elapsed = time.time() - start
 
             if elapsed > max_wait_seconds:
-                self.logger.info(f"Waiting for completion of task but time out ")
+                self.logger.info("Waiting for completion of task but time out ")
                 self.logger.info(
                     f"Configured to wait {max_wait_seconds}, elapsed is {elapsed} "
                 )
-                self.logger.info(f"Job may complete in background.")
+                self.logger.info("Job may complete in background.")
 
             if "id" not in list(self.task.keys()):
                 self.logger.info(
