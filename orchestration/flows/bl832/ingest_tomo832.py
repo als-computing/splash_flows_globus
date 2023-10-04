@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -59,6 +60,15 @@ def ingest(
     str
         Dataset id of the new
     """
+
+    INGEST_STORAGE_ROOT_PATH = os.getenv("INGEST_STORAGE_ROOT_PATH")
+    INGEST_SOURCE_ROOT_PATH = os.getenv("INGEST_SOURCE_ROOT_PATH")
+
+    if not INGEST_SOURCE_ROOT_PATH or not INGEST_SOURCE_ROOT_PATH:
+        raise ValueError(
+            "INGEST_STORAGE_ROOT_PATH and INGEST_SOURCE_ROOT_PATH must be set"
+        )
+
     with h5py.File(file_path, "r") as file:
         file_path = Path(file_path)
         scicat_metadata = _extract_fields(file, scicat_metadata_keys, issues)
@@ -88,11 +98,20 @@ def ingest(
             encoded_scientific_metadata,
             ownable,
         )
-        upload_data_block(scicat_client, file_path, dataset_id, ownable)
+        upload_data_block(
+            scicat_client,
+            file_path,
+            dataset_id, 
+            INGEST_STORAGE_ROOT_PATH,
+            INGEST_SOURCE_ROOT_PATH)
 
         thumbnail_file = build_thumbnail(file["/exchange/data"][0])
         encoded_thumbnail = encode_image_2_thumbnail(thumbnail_file)
-        upload_attachment(scicat_client, encoded_thumbnail, dataset_id, ownable)
+        upload_attachment(
+            scicat_client,
+            encoded_thumbnail,
+            dataset_id,
+            ownable)
 
         return dataset_id
 
@@ -153,16 +172,23 @@ def create_data_files(file_path: Path) -> List[DataFile]:
 
 
 def upload_data_block(
-    scicat_client: ScicatClient, file_path: Path, dataset_id: str, ownable: Ownable
+    scicat_client: ScicatClient,
+    file_path: Path,
+    dataset_id: str,
+    storage_root_path: str,
+    source_root_path: str
 ) -> Datablock:
     "Creates a datablock of files"
-    datafiles = create_data_files(file_path)
+    # calcularte the path where the file will as known to SciCat
+    storage_path = str(file_path).replace(source_root_path, storage_root_path)
+    datafiles = create_data_files(storage_path)
 
     datablock = CreateDatasetOrigDatablockDto(
         size=get_file_size(file_path),
         dataFileList=datafiles
     )
     return scicat_client.upload_dataset_origdatablock(dataset_id, datablock)
+
 
 
 def upload_attachment(
