@@ -8,7 +8,7 @@ from prefect import flow, task, get_run_logger
 from prefect.blocks.system import JSON
 from prefect.blocks.system import Secret
 
-from orchestration import scicat
+from orchestration.flows.bl832 import ingest_tomo832
 from orchestration.flows.bl832.config import Config832
 from orchestration.globus import GlobusEndpoint, start_transfer
 from orchestration.prefect import schedule_prefect_flow
@@ -75,33 +75,7 @@ def transfer_data_to_nersc(
     return success
 
 
-@task(name="test_scicat")
-def test_scicat(config: Config832):
-    logger = get_run_logger()
-    block = Secret.load("scicat-token")
-    token = block.get()
-    scicat.test(config.scicat["jobs_api_url"], token, logger)
 
-
-@task(name="ingest_scicat")
-def ingest_scicat(config: Config832, relative_path):
-    logger = get_run_logger()
-    block = Secret.load("scicat-token")
-    token = block.get()
-
-    # relative path: raw/...
-    # ingestor api maps /globa/cfs/cdirs/als/data_mover to /data_mover
-    # so we want to prepend /data_mover/8.3.2
-    if relative_path[0] == "/":
-        relative_path = relative_path[1:]
-    ingest_path = os.path.join("/data_mover/8.3.2", relative_path)
-    logger.info(
-        f"Sending ingest job to {config.scicat['jobs_api_url']} for file {ingest_path}"
-    )
-    response = scicat.submit_ingest(
-        config.scicat["jobs_api_url"], ingest_path, token, "als832_dx_3", logger=logger
-    )
-    logger.info(response)
 
 
 @flow(name="new_832_file_flow")
@@ -143,7 +117,14 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
         logger.info(
             f"File successfully transferred from data832 to NERSC {file_path}. Task {task}"
         )
-        ingest_scicat(config, relative_path)
+        flow_name = f"ingest scicat: {Path(file_path).name}"
+        # ingest_scicat(config, relative_path)
+        schedule_prefect_flow(
+            "ingest_scicat/ingest_scicat",
+            flow_name,
+            {"relative_path": relative_path},
+            datetime.timedelta(0.0),
+        )
 
     bl832_settings = JSON.load("bl832-settings").value
 
@@ -177,7 +158,7 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
 def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
     logger = get_run_logger()
     config = Config832()
-    test_scicat(config)
+    # test_scicat(config)
     logger.info(f"{str(uuid.uuid4())}{file_path}")
     # copy file to a uniquely-named file in the same folder
     file = Path(file_path)
@@ -198,9 +179,4 @@ def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
     )
 
 
-if __name__ == "__main__":
-    import sys
-    import dotenv
 
-    dotenv.load_dotenv()
-    process_new_832_file(sys.argv[1])
