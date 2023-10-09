@@ -16,3 +16,5 @@ prefect deployment apply prune_spot832-deployment.yaml
 prefect deployment build ./orchestration/flows/bl832/prune.py:prune_data832 -n 'prune_data832' -q bl832
 prefect deployment apply prune_data832-deployment.yaml
 
+prefect deployment build ./orchestration/flows/scicat/ingest.py:ingest_dataset -n 'ingest_dataset' -q bl823 
+prefect deployment apply prune_data832-deployment.yaml

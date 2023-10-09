@@ -118,7 +118,11 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
             f"File successfully transferred from data832 to NERSC {file_path}. Task {task}"
         )
         flow_name = f"ingest scicat: {Path(file_path).name}"
-        ingest_dataset(relative_path, TOMO_INGESTOR_MODULE)
+        try:
+            ingest_dataset(file_path, TOMO_INGESTOR_MODULE)
+        except Exception as e:
+            logger.error(f"SciCat ingest failed with {e}")
+    
         # schedule_prefect_flow(
         #     "ingest_scicat/ingest_scicat",
         #     flow_name,
