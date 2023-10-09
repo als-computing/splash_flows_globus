@@ -8,14 +8,14 @@ from prefect import flow, task, get_run_logger
 from prefect.blocks.system import JSON
 from prefect.blocks.system import Secret
 
-from orchestration.flows.bl832 import ingest_tomo832
+from orchestration.flows.scicat.ingest import ingest_dataset
 from orchestration.flows.bl832.config import Config832
 from orchestration.globus import GlobusEndpoint, start_transfer
 from orchestration.prefect import schedule_prefect_flow
 
 
 API_KEY = os.getenv("API_KEY")
-
+TOMO_INGESTOR_MODULE =  "orchestration.flows.bl832.ingest_tomo832"
 
 @task(name="transfer_spot_to_data")
 def transfer_spot_to_data(
@@ -118,13 +118,13 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
             f"File successfully transferred from data832 to NERSC {file_path}. Task {task}"
         )
         flow_name = f"ingest scicat: {Path(file_path).name}"
-        # ingest_scicat(config, relative_path)
-        schedule_prefect_flow(
-            "ingest_scicat/ingest_scicat",
-            flow_name,
-            {"relative_path": relative_path},
-            datetime.timedelta(0.0),
-        )
+        ingest_dataset(relative_path, TOMO_INGESTOR_MODULE)
+        # schedule_prefect_flow(
+        #     "ingest_scicat/ingest_scicat",
+        #     flow_name,
+        #     {"relative_path": relative_path},
+        #     datetime.timedelta(0.0),
+        # )
 
     bl832_settings = JSON.load("bl832-settings").value
 
