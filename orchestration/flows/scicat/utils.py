@@ -43,6 +43,7 @@ class NPArrayEncoder(json.JSONEncoder):
 def calculate_access_controls(username, beamline, proposal) -> Dict:
     # make an access group list that includes the name of the proposal and the name of the beamline
     access_groups = []
+    beamline = beamline.replace(" '", "").replace("', ", "") # sometimes the beamline name is super dirty  " '8.3.2', "" '8.3.2', "
     # set owner_group to username so that at least someone has access in case no proposal number is found
     owner_group = username
     if beamline:

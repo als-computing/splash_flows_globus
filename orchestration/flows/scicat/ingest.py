@@ -7,7 +7,7 @@ from prefect import flow, task, get_run_logger
 
 from orchestration.flows.scicat.utils import Issue
 
-@flow(name="just_scicat")
+@flow(name="scicat_dataset_ingest")
 def ingest_dataset(file_path: str, ingestor: str):
     """ Ingest a file into SciCat.
 
@@ -72,4 +72,6 @@ def ingest_dataset_task(file_path: str, ingestor_module: str):
 if __name__ == "__main__":
     import sys
 
+    from dotenv import load_dotenv
+    load_dotenv()
     ingest_dataset(sys.argv[1], sys.argv[2])

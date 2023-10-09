@@ -158,11 +158,11 @@ def upload_raw_dataset(
     return dataset_id
 
 
-def create_data_files(file_path: Path) -> List[DataFile]:
+def create_data_files(file_path: Path, storage_path: str) -> List[DataFile]:
     "Collects all fits files"
     datafiles = []
     datafile = DataFile(
-        path=file_path.name,
+        path=storage_path,
         size=get_file_size(file_path),
         time=get_file_mod_time(file_path),
         type="RawDatasets",
@@ -181,7 +181,7 @@ def upload_data_block(
     "Creates a datablock of files"
     # calcularte the path where the file will as known to SciCat
     storage_path = str(file_path).replace(source_root_path, storage_root_path)
-    datafiles = create_data_files(storage_path)
+    datafiles = create_data_files(file_path, storage_path)
 
     datablock = CreateDatasetOrigDatablockDto(
         size=get_file_size(file_path),
@@ -345,17 +345,17 @@ data_sample_keys = [
 ]
 
 
-if __name__ == "__main__":
-    import os
-    ingest(
-        ScicatClient(
-            "http://localhost:3000/api/v3",
-            # "https://dataportal.als.lbl.gov/api/v3",
-            None,
-            "ingestor",
-            os.environ.get("SCICAT_INGEST_PASSWORD"),
-        ),
-        "admin",
-        "/Users/dylanmcreynolds/data/beamlines/8.3.2/20230927_165759_ddd.h5",
-        [],
-    )
+# if __name__ == "__main__":
+#     import os
+
+#     ingest(
+#         ScicatClient(
+#             # "http://localhost:3000/api/v3",
+#             os.environ.get("SCICAT_API_URL"),
+#             None,
+#             os.environ.get("SCICAT_INGEST_USER"),
+#             os.environ.get("SCICAT_INGEST_PASSWORD"),
+#         ),
+#         "/Users/dylanmcreynolds/data/beamlines/8.3.2/raw/20230927_165759_ddd.h5",
+#         [],
+#     )
