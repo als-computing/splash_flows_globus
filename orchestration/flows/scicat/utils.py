@@ -53,7 +53,7 @@ def calculate_access_controls(username, beamline, proposal) -> Dict:
         access_groups.append(username)
         # temporary mapping while beamline controls process request to match beamline name with what comes
         # from ALSHub
-        if beamline == "bl832":
+        if beamline == "bl832" && "8.3.2" not in access_groups:
             access_groups.append("8.3.2")
 
     if proposal and proposal != "None":
