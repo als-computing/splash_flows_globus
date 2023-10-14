@@ -28,7 +28,7 @@ from orchestration.flows.scicat.utils import (
 )
 
 DEFAULT_USER = "8.3.2" # In case there's not proposal number
-
+UNKNWON_EMAIL = "unknown@example.com"
 ingest_spec = "als832_dx_3"
 
 logger = logging.getLogger("scicat_ingest")
@@ -38,6 +38,7 @@ def ingest(
     scicat_client: ScicatClient,
     file_path: str,
     issues: List[Issue],
+    log_level: str = "INFO",
 ) -> str:
     """Ingests a file into scicat
 
@@ -60,7 +61,7 @@ def ingest(
     str
         Dataset id of the new
     """
-
+    logger.setLevel(log_level)
     INGEST_STORAGE_ROOT_PATH = os.getenv("INGEST_STORAGE_ROOT_PATH")
     INGEST_SOURCE_ROOT_PATH = os.getenv("INGEST_SOURCE_ROOT_PATH")
 
@@ -154,6 +155,7 @@ def upload_raw_dataset(
         creationTime=file_mod_time,
         **ownable.dict(),
     )
+    logger.debug(f"dataset: {dataset}")
     dataset_id = scicat_client.upload_new_dataset(dataset)
     return dataset_id
 
@@ -264,8 +266,13 @@ def _get_data_sample(file, sample_size=10):
 
     return data_sample
 
+
 def clean_email(email: str):
     if email:
+        if not email or email.upper() == "NONE":
+            # this is a brutal case, but the beamline sometimes puts in "None" and
+            # the new scicat backend hates that.
+            return UNKNWON_EMAIL
         return email.replace(" ", "").replace(",", "").replace("'", "")
     return None
 
@@ -345,17 +352,16 @@ data_sample_keys = [
 ]
 
 
-# if __name__ == "__main__":
-#     import os
-
-#     ingest(
-#         ScicatClient(
-#             # "http://localhost:3000/api/v3",
-#             os.environ.get("SCICAT_API_URL"),
-#             None,
-#             os.environ.get("SCICAT_INGEST_USER"),
-#             os.environ.get("SCICAT_INGEST_PASSWORD"),
-#         ),
-#         "/Users/dylanmcreynolds/data/beamlines/8.3.2/raw/20230927_165759_ddd.h5",
-#         [],
-#     )
+if __name__ == "__main__":
+    ingest(
+        ScicatClient(
+            # "http://localhost:3000/api/v3",
+            os.environ.get("SCICAT_API_URL"),
+            None,
+            os.environ.get("SCICAT_INGEST_USER"),
+            os.environ.get("SCICAT_INGEST_PASSWORD"),
+        ),
+        "/Users/dylanmcreynolds/data/beamlines/8.3.2/raw/20231013_065251_MSB_Book1_Proj77_Cell3_Gen2_Li_R2G_FastCharge_DuringCharge0.h5",
+        [],
+        log_level="DEBUG",
+    )
