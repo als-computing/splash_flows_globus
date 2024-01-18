@@ -4,8 +4,7 @@ httpx>=0.22.0
 numpy
 pillow
 python-dotenv
-prefect==2.7.9
-pydantic<2.0.0
+prefect==2.14
 pyscicat @ git+https://github.com/dylanmcreynolds/pyscicat@fix_auth
 pyyaml
 authlib
