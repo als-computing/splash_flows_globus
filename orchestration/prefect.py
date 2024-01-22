@@ -3,9 +3,9 @@ import datetime
 import logging
 
 from prefect import get_run_logger, task
-from prefect.client import get_client
-from prefect.orion.utilities.schemas import DateTimeTZ
-from prefect.orion.schemas.states import Scheduled
+from prefect import get_client
+
+from prefect.states import Scheduled
 
 
 logger = logging.getLogger("orchestration.prefect")
@@ -23,7 +23,7 @@ async def schedule(
         assert (
             deployment
         ), f"No deployment found in config for deploymnent_name {deploymnent_name}"
-        date_time_tz = DateTimeTZ.now() + duration_from_now
+        date_time_tz = datetime.datetime.now() + duration_from_now
         await client.create_flow_run_from_deployment(
             deployment.id,
             state=Scheduled(scheduled_time=date_time_tz),
