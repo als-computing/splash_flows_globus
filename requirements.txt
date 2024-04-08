@@ -8,3 +8,4 @@ prefect==2.14.3
 pyscicat @ git+https://github.com/dylanmcreynolds/pyscicat@fix_auth
 pyyaml
 authlib
+sfapi_client

@@ -1,7 +1,7 @@
 from globus_sdk import TransferClient
 
 from orchestration import globus
-from orchestration.nersc import NerscClient
+from ptycho_nersc import NerscPtychoClient
 
 
 class Config7012:
@@ -14,7 +14,7 @@ class Config7012:
         self.endpoints = globus.build_endpoints(config)
         self.apps = globus.build_apps(config)
         self.tc: TransferClient = globus.init_transfer_client(self.apps["als_transfer"])
-        self.nersc = NerscClient(
+        self.nersc = NerscPtychoClient(
             path_client_id,
             path_priv_key,
         )
