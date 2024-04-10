@@ -75,11 +75,6 @@ class NerscClient(Client):
         self.home_path = f"/global/homes/{self.user().name[0]}/{self.user().name}"
         self.scratch_path = f"/pscratch/sd/{self.user().name[0]}/{self.user().name}"
 
-    def request_task_status(self):
-        """Could need session variable in class, if this function 
-        is to be used, due to information access requirements."""
-        pass
-
     def request_job_status(self):
         self.job = self.perlmutter.job(jobid=self.jobid)
 
@@ -106,9 +101,9 @@ class NerscClient(Client):
         self.has_ran = False
 
         self.job_script_string = job_script
-        #self.logger.info(f"Submitting job with script: {job_script}")
+        self.logger.info(f"Submitting job with script: {job_script}")
         self.job = self.perlmutter.submit_job(job_script)
         self.update_job_id()
         #self.update_job_state()
-        #self.logger.info(f"Submitted job id: {self.jobid}")
+        self.logger.info(f"Submitted job id: {self.jobid}")
 

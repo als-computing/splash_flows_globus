@@ -1,10 +1,3 @@
-import json
-import logging
-import time
-
-from authlib.integrations.requests_client import OAuth2Session
-from authlib.oauth2.rfc7523 import PrivateKeyJWT
-
 from orchestration.ptycho_jobscript import (
     get_job_script,
     cdtool_args_string,
