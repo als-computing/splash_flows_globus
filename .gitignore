@@ -131,3 +131,9 @@ splash_flows_globus/
 splash_auth/
 
 *-deployment.yaml
+
+# SFAPI keys
+clientid.txt
+priv_key.jwk
+priv_key.pem
+sfapi_training.json
