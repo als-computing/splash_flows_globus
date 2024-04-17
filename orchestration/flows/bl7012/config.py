@@ -13,9 +13,9 @@ class Config7012:
         self.endpoints = globus.build_endpoints(config)
         self.apps = globus.build_apps(config)
         self.tc: TransferClient = globus.init_transfer_client(self.apps["als_transfer"])
-        self.nersc = NerscPtychoClient(
-            os.getenv("PATH_NERSC_ID"),
-            os.getenv("PATH_NERSC_PRI_KEY"),
-        )
+        # self.nersc = NerscPtychoClient(
+        #     os.getenv("PATH_NERSC_ID"),
+        #     os.getenv("PATH_NERSC_PRI_KEY"),
+        # )
         self.nersc7012 = self.endpoints["nersc7012"]
         self.data7012 = self.endpoints["data7012"]
