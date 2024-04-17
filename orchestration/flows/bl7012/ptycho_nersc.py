@@ -1,4 +1,4 @@
-from orchestration.ptycho_jobscript import (
+from orchestration.flows.bl7012.ptycho_jobscript import (
     get_job_script,
     cdtool_args_string,
     ptychocam_args_string,
