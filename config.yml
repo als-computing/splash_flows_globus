@@ -16,7 +16,7 @@ globus:
       uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
 
     nersc7012:
-      root_path: /global/cfs/cdirs/als/data_mover/7.0.1.2
+      root_path: /global/cfs/cdirs/als/gsharing/bl701/COSMIC_ALL
       uri: nersc.gov
       uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
       name: nersc7012
