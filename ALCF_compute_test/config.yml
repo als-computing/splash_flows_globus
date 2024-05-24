@@ -1,0 +1,57 @@
+globus:
+  globus_endpoints:
+
+    spot832:
+      root_path: /
+      uri: spot832.lbl.gov
+      uuid: 44ae904c-ab64-4145-a8f0-7287de38324d
+    
+    data832:
+      root_path: /data
+      uri: data832.lbl.gov
+      uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
+
+    alcf_eagle832:
+      root_path: /IRIBeta/als/example
+      uri: alcf.anl.gov
+      uuid: 05d2c76a-e867-4f67-aa57-76edeb0beda0
+      name: alcf_eagle832
+
+    alcf_home832:
+      root_path: /dabramov #alcf /home/username
+      uri: alcf.anl.gov
+      uuid: 9032dd3a-e841-4687-a163-2720da731b5b
+      name: alcf_home832
+
+    nersc832:
+      root_path: /global/cfs/cdirs/als/data_mover/iribeta
+      uri: nersc.gov
+      uuid: 6bdc7956-fc0f-4ad2-989c-7aa5ee643a79
+      name: nersc832
+
+    nersc7012:
+      root_path: /global/cfs/cdirs/als/gsharing/data_mover/7012
+      uri: nersc.gov
+      uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
+      name: nersc7012
+
+    data7012:
+      root_path: /
+      uri: hpc.lbl.gov
+      uuid: 639c49be-604f-423c-9c5d-82a53afe1bf1
+      name: data7012
+
+  globus_apps:
+    als_transfer:
+      client_id: ${GLOBUS_CLIENT_ID}
+      client_secret: ${GLOBUS_CLIENT_SECRET}
+
+prefect:
+  deployments:
+    - type_spec: new_file_832
+      uuid: ccf2cb27-d4f8-420b-8115-a5036c69b1da
+
+scicat:
+  jobs_api_url: https://dataportal.als.lbl.gov/api/ingest/jobs
+
+
