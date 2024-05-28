@@ -1,8 +1,12 @@
 import datetime
+from dotenv import load_dotenv
 import os
 from pathlib import Path
+import time
 import uuid
 
+from globus_compute_sdk import Client, Executor
+import globus_sdk
 from globus_sdk import TransferClient
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import JSON
@@ -11,11 +15,99 @@ from prefect.blocks.system import Secret
 from orchestration.flows.scicat.ingest import ingest_dataset
 from orchestration.flows.bl832.config import Config832
 from orchestration.globus import GlobusEndpoint, start_transfer
+from orchestration.globus_flows_utils import get_flows_client, get_specific_flow_client
 from orchestration.prefect import schedule_prefect_flow
+
+
+# Load environment variables
+load_dotenv()
+
+# Set the client ID and fetch client secret from environment
+# CLIENT_ID = os.getenv('GLOBUS_CLIENT_ID')
+# CLIENT_SECRET = os.getenv('GLOBUS_CLIENT_SECRET')
+
+# confidential_client = globus_sdk.ConfidentialAppAuthClient(
+#     client_id=CLIENT_ID, client_secret=CLIENT_SECRET
+# )
+
+# SCOPES = [
+#         globus_sdk.FlowsClient.scopes.manage_flows,
+#         globus_sdk.FlowsClient.scopes.run_status,
+#     ]
+
+# cc_authorizer = globus_sdk.ClientCredentialsAuthorizer(confidential_client, SCOPES)
+# tc = globus_sdk.TransferClient(authorizer=cc_authorizer)
 
 
 API_KEY = os.getenv("API_KEY")
 TOMO_INGESTOR_MODULE =  "orchestration.flows.bl832.ingest_tomo832"
+
+@flow(name="alcf_tomopy_reconstruction_flow")
+def alcf_tomopy_reconstruction_flow():
+    logger = get_run_logger()
+    config = Config832()
+    
+    # Initialize the Globus Compute Client
+    gcc = Client()
+    polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT") # COMPUTE endpoint, not TRANSFER endpoint
+    gce = Executor(endpoint_id=polaris_endpoint_id, client=gcc)
+
+    reconstruction_func = os.getenv("GLOBUS_RECONSTRUCTION_FUNC")
+    collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
+    function_inputs = {"rundir": "/eagle/IRIBeta/als/example"}
+
+    # Define the json flow
+    flow_input = {
+        "input": {
+        "source": {
+            "id": collection_endpoint,
+            "path": "/example"
+        },
+        "destination": {
+            "id": collection_endpoint,
+            "path": "/bl832/"
+        },
+        "recursive_tx": True,
+        "compute_endpoint_id": polaris_endpoint_id,
+        "compute_function_id": reconstruction_func,
+        "compute_function_kwargs": function_inputs
+        }
+    }
+    collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
+
+    # Flow ID (only generate once!)
+    flow_id = os.getenv("GLOBUS_FLOW_ID")
+
+    # Run the flow
+    fc = get_flows_client()
+    flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
+
+    try:
+        flow_action = flow_client.run_flow(flow_input, label="ALS run", tags=["demo", "als", "tomopy"])
+        flow_run_id = flow_action['action_id']
+        logger.info(f'Flow action started with id: {flow_run_id}')
+        logger.info(f"Monitor your flow here: https://app.globus.org/runs/{flow_run_id}")
+
+        # Monitor flow status
+        flow_status = flow_action['status']
+        logger.info(f'Initial flow status: {flow_status}')
+        while flow_status in ['ACTIVE', 'INACTIVE']:
+            time.sleep(10)
+            flow_action = fc.get_run(flow_run_id)
+            flow_status = flow_action['status']
+            logger.info(f'Updated flow status: {flow_status}')
+            # Log additional details about the flow status
+            logger.info(f'Flow action details: {flow_action}')
+
+        if flow_status != 'SUCCEEDED':
+            logger.error(f'Flow failed with status: {flow_status}')
+            # Log additional details about the failure
+            logger.error(f'Flow failure details: {flow_action}')
+        else:
+            logger.info(f'Flow completed successfully with status: {flow_status}')
+    except Exception as e:
+        logger.error(f"Error running flow: {e}")
+
 
 @task(name="transfer_spot_to_data")
 def transfer_spot_to_data(
@@ -75,11 +167,8 @@ def transfer_data_to_nersc(
     return success
 
 
-
-
-
 @flow(name="new_832_file_flow")
-def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=True):
+def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=True, send_to_alcf=False):
     """
     Sends a file along a path:
         - Copy from spot832 to data832
@@ -109,6 +198,21 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
     transfer_spot_to_data(relative_path, config.tc, config.spot832, config.data832)
 
     logger.info(f"Transferring {file_path} to spot to data")
+
+    # Send data to ALCF (default is False) and process it using Tomopy
+    if not is_export_control and send_to_alcf:
+        # Call the task to transfer data
+        # logger.info(f"Transferring {file_path} to ALCF")
+
+        # transfer_success = transfer_data_to_alcf(file_path, transfer_client, config.nersc832, config.alcf832)
+        # if not transfer_success:
+        #     logger.error("Transfer failed due to configuration or authorization issues.")
+        # else:
+        #     logger.info("Transfer successful.")
+
+        logger.info(f"Running ALCF tomopy reconstruction flow for {file_path} on ALCF")
+        alcf_tomopy_reconstruction_flow()
+
 
     if not is_export_control and send_to_nersc:
         transfer_data_to_nersc(

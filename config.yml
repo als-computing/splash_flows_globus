@@ -10,6 +10,18 @@ globus:
       uri: data832.lbl.gov
       uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
 
+    alcf_eagle832:
+      root_path: /IRIBeta/als/example
+      uri: alcf.anl.gov
+      uuid: 05d2c76a-e867-4f67-aa57-76edeb0beda0
+      name: alcf_eagle832
+
+    alcf_home832:
+      root_path: / #alcf /home/username
+      uri: alcf.anl.gov
+      uuid: 9032dd3a-e841-4687-a163-2720da731b5b
+      name: alcf_home832
+
     nersc832:
       root_path: /global/cfs/cdirs/als/data_mover/8.3.2
       uri: nersc.gov

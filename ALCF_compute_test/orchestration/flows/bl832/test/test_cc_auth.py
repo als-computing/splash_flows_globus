@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 import globus_sdk
 import os
-from globus_sdk.scopes import TransferScopes
 
 # Load environment variables
 load_dotenv()
@@ -9,9 +8,7 @@ load_dotenv()
 # Set the client ID and fetch client secret from environment
 CLIENT_ID = os.getenv('GLOBUS_CLIENT_ID')
 CLIENT_SECRET = os.getenv('GLOBUS_CLIENT_SECRET')
-# ENDPOINT_ID = "cf333f97-ff8c-40f7-b25a-21fe726f1ea0" # CGS endpoint ID
 ENDPOINT_ID = "55c3adf6-31f1-4647-9a38-52591642f7e7"
-# ENDPOINT_ID = "05d2c76a-e867-4f67-aa57-76edeb0beda0" # Eagle endpoint ID
 # Define the necessary scope for transfer
 # SCOPES = "urn:globus:auth:scope:transfer.api.globus.org:all"
 SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/05d2c76a-e867-4f67-aa57-76edeb0beda0/data_access]']

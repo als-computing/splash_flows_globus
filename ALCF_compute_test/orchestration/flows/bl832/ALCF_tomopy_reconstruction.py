@@ -1,71 +1,34 @@
-# from globus_prefect_test.orchestration.globus_flow_alcf_tomopy import reconstruction_wrapper
-
 from dotenv import load_dotenv
 from globus_compute_sdk import Client, Executor
 import globus_sdk
-# from globus_sdk import TransferClient
-# from orchestration import globus
 from orchestration.flows.bl832.config import Config832
-from globus_prefect_test.orchestration.globus_flows_utils import get_flows_client, get_specific_flow_client
-# from orchestration.globus import GlobusEndpoint, start_transfer
+from orchestration.globus_flows_utils import get_flows_client, get_specific_flow_client
 import os
 from pathlib import Path
 from prefect import flow, task, get_run_logger
 import time
 import uuid
 
-
 # Load environment variables
 load_dotenv()
+config = Config832()
 
 # Set the client ID and fetch client secret from environment
 CLIENT_ID = os.getenv('GLOBUS_CLIENT_ID')
 CLIENT_SECRET = os.getenv('GLOBUS_CLIENT_SECRET')
 
-config = Config832()
-
 confidential_client = globus_sdk.ConfidentialAppAuthClient(
     client_id=CLIENT_ID, client_secret=CLIENT_SECRET
 )
-# SCOPES = ["urn:globus:auth:scope:transfer.api.globus.org:all"]
 
 SCOPES = [
         globus_sdk.FlowsClient.scopes.manage_flows,
         globus_sdk.FlowsClient.scopes.run_status,
     ]
 
-# SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/55c3adf6-31f1-4647-9a38-52591642f7e7/data_access]']
-print(SCOPES)
 cc_authorizer = globus_sdk.ClientCredentialsAuthorizer(confidential_client, SCOPES)
 tc = globus_sdk.TransferClient(authorizer=cc_authorizer)
 
-@flow(name="reconstruction_wrapper")
-def reconstruction_wrapper(rundir, parametersfile="inputOneSliceOfEach.txt"):
-    """
-    Python function that wraps around the application call for Tomopy reconstruction on ALCF
-
-    Args:
-        rundir (str): the directory on the eagle file system (ALCF) where the input data are located
-        parametersfile (str, optional): Defaults to "inputOneSliceOfEach.txt", which is already on ALCF
-
-    Returns:
-        str: confirmation message regarding reconstruction and time to completion
-    """
-    import time
-    import os
-    import subprocess
-    start = time.time()
-
-    # Move to directory where data are located
-    os.chdir(rundir)
-
-    # Run reconstruction.py
-    command = f"python /eagle/IRIBeta/als/example/reconstruction.py {parametersfile}"
-    res = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    end = time.time()
-    
-    return f"Reconstructed data specified in {parametersfile} in {end-start} seconds;\n {res}"
 
 @flow(name="alcf_tomopy_reconstruction_flow")
 def alcf_tomopy_reconstruction_flow():
@@ -77,31 +40,8 @@ def alcf_tomopy_reconstruction_flow():
     polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT") # COMPUTE endpoint, not TRANSFER endpoint
     gce = Executor(endpoint_id=polaris_endpoint_id, client=gcc)
 
-    # Register and submit the function
-    # reconstruction_func = gcc.register_function(reconstruction_wrapper)
-    # logger.info(f"Function registered with ID: {reconstruction_func}")
-    # future = gce.submit_to_registered_function(args=["/eagle/IRIBeta/als/example"], function_id=reconstruction_func)
-    
-    # # Wait for the result and log it
-    # try:
-    #     result = future.result()
-    #     logger.info(f"Reconstruction completed with result: {result}")
-    # except Exception as e:
-    #     logger.error(f"Error during function submission or execution: {e}")
-    #     return  # Exit if there is an error during reconstruction
-
-    # reconstruction_func = "d8645197-0bff-4b6f-a02d-e1df9841ed90"
-    reconstruction_func = "ebec3c4f-b052-4137-ba82-5d91928e16dc"
-    collection_endpoint = "55c3adf6-31f1-4647-9a38-52591642f7e7"
-    # collection_endpoint = "cf333f97-ff8c-40f7-b25a-21fe726f1ea0"
-    # Where the data will transfer to after reconstruction (ALCF Home)
-    alcfhome_transfer_endpoint_id = config.alcf_home832.uuid
-    destination_path_on_alcfhome = config.alcf_home832.root_path
-
-    # Where the raw data are located to be reconstructed (ALCF Eagle)
-    eagle_transfer_endpoint_id = config.alcf_eagle832.uuid
-    source_path_on_eagle = config.alcf_eagle832.root_path
-
+    reconstruction_func = os.getenv("GLOBUS_RECONSTRUCTION_FUNC")
+    collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
     function_inputs = {"rundir": "/eagle/IRIBeta/als/example"}
 
     # Define the json flow
@@ -112,11 +52,8 @@ def alcf_tomopy_reconstruction_flow():
             "path": "/example"
         },
         "destination": {
-            "id": collection_endpoint, #eagle_transfer_endpoint_id,
-            "path": "/bl832/" #source_path_on_eagle
-
-            # "id": alcfhome_transfer_endpoint_id,
-            # "path": destination_path_on_alcfhome
+            "id": collection_endpoint,
+            "path": "/bl832/"
         },
         "recursive_tx": True,
         "compute_endpoint_id": polaris_endpoint_id,
@@ -128,11 +65,9 @@ def alcf_tomopy_reconstruction_flow():
 
     # Flow ID (only generate once!)
     flow_id = os.getenv("GLOBUS_FLOW_ID")
-    # flow_id = "91ce59ba-cbf1-45e3-b4f3-c86aeaacda42"
 
     # Run the flow
     fc = get_flows_client()
-    # run_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
     flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
 
     try:

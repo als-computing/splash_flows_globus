@@ -18,7 +18,7 @@ globus:
       name: alcf_eagle832
 
     alcf_home832:
-      root_path: /dabramov #alcf /home/username
+      root_path: / #alcf /home/username
       uri: alcf.anl.gov
       uuid: 9032dd3a-e841-4687-a163-2720da731b5b
       name: alcf_home832

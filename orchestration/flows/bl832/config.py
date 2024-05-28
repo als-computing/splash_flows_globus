@@ -12,4 +12,6 @@ class Config832:
         self.spot832 = self.endpoints["spot832"]
         self.data832 = self.endpoints["data832"]
         self.nersc832 = self.endpoints["nersc832"]
+        self.alcf_eagle832 = self.endpoints["alcf_eagle832"]
+        self.alcf_home832 = self.endpoints["alcf_home832"]
         self.scicat = config["scicat"]
