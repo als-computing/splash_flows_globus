@@ -11,29 +11,10 @@ import uuid
 
 # Load environment variables
 load_dotenv()
-config = Config832()
-
-# Set the client ID and fetch client secret from environment
-CLIENT_ID = os.getenv('GLOBUS_CLIENT_ID')
-CLIENT_SECRET = os.getenv('GLOBUS_CLIENT_SECRET')
-
-confidential_client = globus_sdk.ConfidentialAppAuthClient(
-    client_id=CLIENT_ID, client_secret=CLIENT_SECRET
-)
-
-SCOPES = [
-        globus_sdk.FlowsClient.scopes.manage_flows,
-        globus_sdk.FlowsClient.scopes.run_status,
-    ]
-
-cc_authorizer = globus_sdk.ClientCredentialsAuthorizer(confidential_client, SCOPES)
-tc = globus_sdk.TransferClient(authorizer=cc_authorizer)
-
 
 @flow(name="alcf_tomopy_reconstruction_flow")
 def alcf_tomopy_reconstruction_flow():
     logger = get_run_logger()
-    config = Config832()
     
     # Initialize the Globus Compute Client
     gcc = Client()
