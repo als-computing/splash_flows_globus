@@ -10,6 +10,12 @@ globus:
       uri: data832.lbl.gov
       uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
 
+    alcf_iribeta_cgs:
+      root_path: /
+      uri: alcf.anl.gov
+      uuid: 55c3adf6-31f1-4647-9a38-52591642f7e7
+      name: alcf_iribeta_cgs
+
     alcf_eagle832:
       root_path: /IRIBeta/als/example
       uri: alcf.anl.gov
@@ -21,6 +27,18 @@ globus:
       uri: alcf.anl.gov
       uuid: 9032dd3a-e841-4687-a163-2720da731b5b
       name: alcf_home832
+
+    nersc_test:
+      root_path: /global/cfs/cdirs/als/data_mover/share/dabramov/BLS-00564_dyparkinson/
+      uri: nersc.gov
+      uuid: 6bdc7956-fc0f-4ad2-989c-7aa5ee643a79
+      name: nersc_test
+
+    nersc_alsdev:
+      root_path: /global/homes/a/alsdev/test_directory/
+      uri: nersc.gov
+      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
+      name: nersc_alsdev
 
     nersc832:
       root_path: /global/cfs/cdirs/als/data_mover/8.3.2

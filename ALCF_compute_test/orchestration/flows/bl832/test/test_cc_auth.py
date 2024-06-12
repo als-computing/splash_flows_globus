@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 import globus_sdk
 import os
+import time
+from prefect import flow, task, get_run_logger
 
 # Load environment variables
 load_dotenv()
@@ -8,107 +10,146 @@ load_dotenv()
 # Set the client ID and fetch client secret from environment
 CLIENT_ID = os.getenv('GLOBUS_CLIENT_ID')
 CLIENT_SECRET = os.getenv('GLOBUS_CLIENT_SECRET')
-ENDPOINT_ID = "55c3adf6-31f1-4647-9a38-52591642f7e7"
-# Define the necessary scope for transfer
-# SCOPES = "urn:globus:auth:scope:transfer.api.globus.org:all"
-SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/05d2c76a-e867-4f67-aa57-76edeb0beda0/data_access]']
 
-# Initialize the ConfidentialAppAuthClient for a service account
+SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/d40248e6-d874-4f7b-badd-2c06c16f1a58/data_access]']
+ENDPOINT_ID = "d40248e6-d874-4f7b-badd-2c06c16f1a58" # NERSC DTN alsdev Collab
+
+# ENDPOINT_ID = "6bdc7956-fc0f-4ad2-989c-7aa5ee643a79"
+# SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/6bdc7956-fc0f-4ad2-989c-7aa5ee643a79/data_access]']
+
+# nersc_test:
+#   root_path: /global/cfs/cdirs/als/data_mover/share/dabramov/BLS-00564_dyparkinson/
+#   uri: nersc.gov
+#   uuid: 6bdc7956-fc0f-4ad2-989c-7aa5ee643a79
+#   name: nersc_test
+
+
+# ENDPOINT_ID = "d8f85a4f-bd79-45a7-90fb-f6d56d4fbbf2"
+# SCOPES = "urn:globus:auth:scope:transfer.api.globus.org:all"
+
 def initialize_transfer_client():
-    confidential_client = globus_sdk.ConfidentialAppAuthClient(
-        client_id=CLIENT_ID, client_secret=CLIENT_SECRET
-    )
+    confidential_client = globus_sdk.ConfidentialAppAuthClient(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
     cc_authorizer = globus_sdk.ClientCredentialsAuthorizer(confidential_client, SCOPES)
     return globus_sdk.TransferClient(authorizer=cc_authorizer)
 
-# Initialize the TransferClient
-transfer_client = initialize_transfer_client()
+@task
+def check_permissions(transfer_client, endpoint_id):
+    logger = get_run_logger()
+    try:
+        endpoint = transfer_client.get_endpoint(endpoint_id)
+        logger.info(f"Endpoint ID: {endpoint['id']}")
+        logger.info(f"Endpoint display name: {endpoint['display_name']}")
+        logger.info(f"Endpoint owner: {endpoint['owner_string']}")
+        # Print other relevant information about the endpoint
+    except globus_sdk.GlobusAPIError as err:
+        logger.error(f"Error fetching endpoint information: {err.message}")
+        raise
 
-# Access the directory in the endpoint
+@task
 def list_directory(transfer_client, endpoint_id, path):
+    logger = get_run_logger()
+    start_time = time.time()
     try:
         response = transfer_client.operation_ls(endpoint_id, path=path)
-        print(f"Contents of {path} in endpoint {endpoint_id}:")
+        logger.info(f"Contents of {path} in endpoint {endpoint_id}:")
         if not response:
-            print(f"No contents found in {path}.")
+            logger.info(f"No contents found in {path}.")
         for item in response:
-            print(f"{item['type']} - {item['name']}")
+            logger.info(f"{item['type']} - {item['name']}")
     except globus_sdk.GlobusAPIError as err:
-        print(f"Error accessing {path} in endpoint {endpoint_id}: {err.message}")
+        logger.error(f"Error accessing {path} in endpoint {endpoint_id}: {err.message}")
         if err.info.consent_required:
-            print(
-                "Got a ConsentRequired error with scopes:",
-                err.info.consent_required.required_scopes,
-            )
+            logger.error(f"Got a ConsentRequired error with scopes: {err.info.consent_required.required_scopes}")
         elif err.code == "PermissionDenied":
-            print(f"Permission denied for accessing {path}. Ensure proper permissions are set.")
+            logger.error(f"Permission denied for accessing {path}. Ensure proper permissions are set.")
+        elif err.http_status == 500:
+            logger.error(f"Server error when accessing {path} in endpoint {endpoint_id}.")
         else:
-            print(f"An unexpected error occurred: {err}")
+            logger.error(f"An unexpected error occurred: {err}")
+    finally:
+        elapsed_time = time.time() - start_time
+        logger.info(f"list_directory task took {elapsed_time:.2f} seconds")
 
-# Create a new directory in the endpoint
-def create_directory(transfer_client, endpoint_id, path, directory_name):
+@task
+def create_directory(transfer_client, endpoint_id, base_path, directory_name):
+    logger = get_run_logger()
+    start_time = time.time()
     try:
-        full_path = os.path.join(path, directory_name)
-        transfer_client.operation_mkdir(endpoint_id, full_path)
-        print(f"Successfully created directory {full_path} in endpoint {endpoint_id}.")
-    except globus_sdk.GlobusAPIError as err:
-        print(f"Error creating directory {full_path} in endpoint {endpoint_id}: {err.message}")
-        if err.info.consent_required:
-            print(
-                "Got a ConsentRequired error with scopes:",
-                err.info.consent_required.required_scopes,
-            )
-        elif err.code == "PermissionDenied":
-            print(f"Permission denied for creating directory {full_path}. Ensure proper permissions are set.")
-        else:
-            print(f"An unexpected error occurred: {err}")
+        # Ensure base path is realistic and ends with '/'
+        if not base_path.endswith('/'):
+            base_path += '/'
+        if base_path.startswith('/'):
+            base_path = base_path.lstrip('/')
+        
+        full_path = base_path + directory_name
 
-# Remove a directory in the endpoint
+        # Validate the path
+        if full_path.startswith('/'):
+            raise ValueError(f"Invalid directory path: {full_path}")
+
+        # Attempt to create the directory
+        transfer_client.operation_mkdir(endpoint_id, full_path)
+        logger.info(f"Successfully created directory {full_path} in endpoint {endpoint_id}.")
+    except ValueError as ve:
+        logger.error(f"ValueError: {ve}")
+    except globus_sdk.GlobusAPIError as err:
+        logger.error(f"Error creating directory {full_path} in endpoint {endpoint_id}: {err.message}")
+        if err.info.consent_required:
+            logger.error(f"Got a ConsentRequired error with scopes: {err.info.consent_required.required_scopes}")
+        elif err.code == "PermissionDenied":
+            logger.error(f"Permission denied for creating directory {full_path}. Ensure proper permissions are set.")
+        elif err.http_status == 500:
+            logger.error(f"Server error when creating directory {full_path} in endpoint {endpoint_id}.")
+        else:
+            logger.error(f"An unexpected error occurred: {err}")
+    finally:
+        elapsed_time = time.time() - start_time
+        logger.info(f"create_directory task took {elapsed_time:.2f} seconds")
+
+@task
 def remove_directory(transfer_client, endpoint_id, path):
+    logger = get_run_logger()
+    start_time = time.time()
     try:
         delete_data = globus_sdk.DeleteData(transfer_client, endpoint_id, recursive=True)
         delete_data.add_item(path)
         transfer_result = transfer_client.submit_delete(delete_data)
-        print(f"Successfully submitted request to remove directory {path} in endpoint {endpoint_id}. Task ID: {transfer_result['task_id']}")
+        logger.info(f"Successfully submitted request to remove directory {path} in endpoint {endpoint_id}. Task ID: {transfer_result['task_id']}")
     except globus_sdk.GlobusAPIError as err:
-        print(f"Error removing directory {path} in endpoint {endpoint_id}: {err.message}")
+        logger.error(f"Error removing directory {path} in endpoint {endpoint_id}: {err.message}")
         if err.info.consent_required:
-            print(
-                "Got a ConsentRequired error with scopes:",
-                err.info.consent_required.required_scopes,
-            )
+            logger.error(f"Got a ConsentRequired error with scopes: {err.info.consent_required.required_scopes}")
         elif err.code == "PermissionDenied":
-            print(f"Permission denied for removing directory {path}. Ensure proper permissions are set.")
+            logger.error(f"Permission denied for removing directory {path}. Ensure proper permissions are set.")
+        elif err.http_status == 500:
+            logger.error(f"Server error when removing directory {path} in endpoint {endpoint_id}.")
         else:
-            print(f"An unexpected error occurred: {err}")
+            logger.error(f"An unexpected error occurred: {err}")
+    finally:
+        elapsed_time = time.time() - start_time
+        logger.info(f"remove_directory task took {elapsed_time:.2f} seconds")
 
+@flow
+def main_flow():
+    transfer_client = initialize_transfer_client()
+    endpoint_id = ENDPOINT_ID
+    base_path = ""
 
-# List the contents of the specified directories
-try:
+    # Check permissions for the endpoint
+    check_permissions(transfer_client, endpoint_id)
+
     # List the contents of the root directory
-    print("Listing / directory:")
-    list_directory(transfer_client, ENDPOINT_ID, "/")
+    logger = get_run_logger()
+    logger.info("Listing / directory:")
+    list_directory(transfer_client, endpoint_id, base_path)
 
     # Create a new directory in the root directory
-    new_directory_name = "test_directory"
-    # create_directory(transfer_client, ENDPOINT_ID, "/test_directory/", new_directory_name)
-    remove_directory(transfer_client, ENDPOINT_ID, "/test_directory/")
+    new_directory_name = "test_directory/"
+    create_directory(transfer_client, endpoint_id, base_path, new_directory_name)
 
     # List the contents again to verify the new directory
-    print(f"\nListing / directory after creating {new_directory_name}:")
-    list_directory(transfer_client, ENDPOINT_ID, "/")
+    logger.info(f"\nListing / directory after creating {new_directory_name}:")
+    list_directory(transfer_client, endpoint_id, base_path)
 
-
-except globus_sdk.TransferAPIError as err:
-    print(f"Error: {err.message}")
-    if err.info.consent_required:
-        print(
-            "Got a ConsentRequired error with scopes:",
-            err.info.consent_required.required_scopes,
-        )
-    elif err.code == "PermissionDenied":
-        print("Permission denied. Ensure proper permissions are set.")
-    else:
-        print("An unexpected error occurred.")
-
-
+if __name__ == "__main__":
+    main_flow()

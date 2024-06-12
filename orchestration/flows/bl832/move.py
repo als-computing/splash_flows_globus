@@ -41,18 +41,18 @@ def alcf_tomopy_reconstruction_flow():
     # Define the json flow
     flow_input = {
         "input": {
-        "source": {
-            "id": collection_endpoint,
-            "path": "/example"
-        },
-        "destination": {
-            "id": collection_endpoint,
-            "path": "/bl832/"
-        },
-        "recursive_tx": True,
-        "compute_endpoint_id": polaris_endpoint_id,
-        "compute_function_id": reconstruction_func,
-        "compute_function_kwargs": function_inputs
+            "source": {
+                "id": collection_endpoint,
+                "path": "/example"
+            },
+            "destination": {
+                "id": collection_endpoint,
+                "path": "/bl832/"
+            },
+            "recursive_tx": True,
+            "compute_endpoint_id": polaris_endpoint_id,
+            "compute_function_id": reconstruction_func,
+            "compute_function_kwargs": function_inputs
         }
     }
     collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
@@ -148,6 +148,48 @@ def transfer_data_to_nersc(
 
     return success
 
+@task(name="transfer_data_alcf")
+def transfer_data_alcf(
+        file_path: str,
+        transfer_client: TransferClient,
+        source_endpoint: GlobusEndpoint,
+        destination_endpoint: GlobusEndpoint
+    ):
+    """
+    Transfer data to/from ALCF endpoints.
+    Args:
+        file_path (str): Path to the file that needs to be transferred.
+        transfer_client (TransferClient): TransferClient instance.
+        source_endpoint (GlobusEndpoint): Source endpoint.
+        alcf_endpoint (GlobusEndpoint): Destination endpoint.
+    """
+    logger = get_run_logger()
+
+    # Prepare the transfer data
+    # if source_file begins with "/", it will mess up os.path.join
+    if file_path[0] == "/":
+        file_path = file_path[1:]
+
+    source_path = os.path.join(source_endpoint.root_path, file_path)
+    dest_path = os.path.join(destination_endpoint.root_path, file_path)
+
+    # Start the transfer
+    try:
+        # transfer_result = transfer_client.submit_transfer(transfer_data)
+        success = start_transfer(
+            transfer_client,
+            source_endpoint,
+            source_path,
+            destination_endpoint,
+            dest_path,
+            max_wait_seconds=600,
+            logger=logger,
+        )
+        logger.info(f"Transfer submitted, task ID: {success['task_id']}")
+        return success
+    except globus_sdk.services.transfer.errors.TransferAPIError as e:
+        logger.error(f"Failed to submit transfer: {e}")
+        return False
 
 @flow(name="new_832_file_flow")
 def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=True, send_to_alcf=False):
@@ -181,19 +223,28 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
 
     logger.info(f"Transferring {file_path} to spot to data")
 
-    # Send data to ALCF (default is False) and process it using Tomopy
+    # Send data to ALCF (default is False), process it using Tomopy, and send back to NERSC
     if not is_export_control and send_to_alcf:
         # Call the task to transfer data
-        # logger.info(f"Transferring {file_path} to ALCF")
+        logger.info(f"Transferring {file_path} to ALCF")
 
-        # transfer_success = transfer_data_to_alcf(file_path, transfer_client, config.nersc832, config.alcf832)
-        # if not transfer_success:
-        #     logger.error("Transfer failed due to configuration or authorization issues.")
-        # else:
-        #     logger.info("Transfer successful.")
+        transfer_success = transfer_data_alcf(file_path, config.tc, config.spot832, config.alcf_iribeta_cgs)
+        if not transfer_success:
+            logger.error("Transfer failed due to configuration or authorization issues.")
+        else:
+            logger.info("Transfer successful.")
 
         logger.info(f"Running ALCF tomopy reconstruction flow for {file_path} on ALCF")
         alcf_tomopy_reconstruction_flow()
+
+        # Call the task to transfer data
+        logger.info(f"Transferring {file_path} from ALCF to NERSC")
+
+        transfer_success = transfer_data_alcf(file_path, config.tc, config.alcf_iribeta_cgs, config.nersc832)
+        if not transfer_success:
+            logger.error("Transfer failed due to configuration or authorization issues.")
+        else:
+            logger.info("Transfer successful.")
 
 
     if not is_export_control and send_to_nersc:

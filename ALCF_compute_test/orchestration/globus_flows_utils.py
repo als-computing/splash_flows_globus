@@ -8,7 +8,7 @@ from globus_sdk import (
 )
 from globus_sdk.scopes import TransferScopes, GCSCollectionScopeBuilder, MutableScope
 from globus_sdk.tokenstorage import SimpleJSONFileAdapter
-
+from pprint import pprint
 
 MY_FILE_ADAPTER = SimpleJSONFileAdapter(os.path.expanduser("~/.sdk-manage-flow.json"))
 
@@ -82,20 +82,25 @@ def get_specific_flow_client(flow_id, collection_ids=None):
     flow_client = SpecificFlowClient(flow_id, authorizer=flows_authorizer)
 
     # Request token for Transfer scopes
-    transfer_scope = TransferScopes.make_mutable("all")
     transfer_action_provider_scope = MutableScope(
         "https://auth.globus.org/scopes/actions.globus.org/transfer/transfer"
     )
+    transfer_scope = TransferScopes.make_mutable("all")
 
     for collection_id in collection_ids:
         gcs_data_access_scope = GCSCollectionScopeBuilder(collection_id).make_mutable(
             "data_access", optional=True
         )
+        transfer_action_provider_scope.add_dependency(gcs_data_access_scope)
+        transfer_action_provider_scope.add_dependency(transfer_scope)
 
+    
     transfer_action_provider_scope.add_dependency(transfer_scope)
     transfer_scopes = [
         "urn:globus:auth:scope:transfer.api.globus.org:all",
         transfer_action_provider_scope
     ]
-
+    pprint(transfer_scope)
+    pprint(transfer_scopes)
+    pprint(flow_client)
     return flow_client

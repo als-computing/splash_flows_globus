@@ -1,7 +1,7 @@
 from dotenv import load_dotenv, set_key
 from globus_compute_sdk import Client, Executor
 from orchestration.globus_flows_utils import get_flows_client, get_specific_flow_client
-
+from pprint import pprint
 
 """
 init.py only needs to be run once to authenticate the polaris (alcf) endpoint ID on the target machine.
@@ -31,6 +31,8 @@ def reconstruction_wrapper(rundir, parametersfile="inputOneSliceOfEach.txt"):
 
         # Run reconstruction.py
         command = f"python /eagle/IRIBeta/als/example/reconstruction.py {parametersfile}"
+        # command = f"python /eagle/IRIBeta/als/example/reconstruction.py"
+
         res = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         end = time.time()
@@ -83,13 +85,17 @@ def create_flow_definition():
 
 if __name__ == "__main__":
     gc = Client()
+    pprint(gc)
     dotenv_file = load_dotenv()
     polaris_endpoint_id = "3e0b1459-e007-4c70-a5db-ea625a4cb3bf"
+    pprint("globus compute endpoint")
     gce = Executor(endpoint_id=polaris_endpoint_id)
+    pprint(gce)
     future = gce.submit(reconstruction_wrapper, "/eagle/IRIBeta/als/example")
+    pprint(future)
     # print(future.result())
     reconstruction_func = gc.register_function(reconstruction_wrapper)
-    print(reconstruction_func)
+    pprint(reconstruction_func)
     future = gce.submit_to_registered_function(args=["/eagle/IRIBeta/als/example"], function_id=reconstruction_func)
     future.result()
     flow_definition = create_flow_definition()
