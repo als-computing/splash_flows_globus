@@ -25,71 +25,6 @@ load_dotenv()
 API_KEY = os.getenv("API_KEY")
 TOMO_INGESTOR_MODULE =  "orchestration.flows.bl832.ingest_tomo832"
 
-@flow(name="alcf_tomopy_reconstruction_flow")
-def alcf_tomopy_reconstruction_flow():
-    logger = get_run_logger()
-    
-    # Initialize the Globus Compute Client
-    gcc = Client()
-    polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT") # COMPUTE endpoint, not TRANSFER endpoint
-    gce = Executor(endpoint_id=polaris_endpoint_id, client=gcc)
-
-    reconstruction_func = os.getenv("GLOBUS_RECONSTRUCTION_FUNC")
-    collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
-    function_inputs = {"rundir": "/eagle/IRIBeta/als/example"}
-
-    # Define the json flow
-    flow_input = {
-        "input": {
-            "source": {
-                "id": collection_endpoint,
-                "path": "/example"
-            },
-            "destination": {
-                "id": collection_endpoint,
-                "path": "/bl832/"
-            },
-            "recursive_tx": True,
-            "compute_endpoint_id": polaris_endpoint_id,
-            "compute_function_id": reconstruction_func,
-            "compute_function_kwargs": function_inputs
-        }
-    }
-    collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
-
-    # Flow ID (only generate once!)
-    flow_id = os.getenv("GLOBUS_FLOW_ID")
-
-    # Run the flow
-    fc = get_flows_client()
-    flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
-
-    try:
-        flow_action = flow_client.run_flow(flow_input, label="ALS run", tags=["demo", "als", "tomopy"])
-        flow_run_id = flow_action['action_id']
-        logger.info(f'Flow action started with id: {flow_run_id}')
-        logger.info(f"Monitor your flow here: https://app.globus.org/runs/{flow_run_id}")
-
-        # Monitor flow status
-        flow_status = flow_action['status']
-        logger.info(f'Initial flow status: {flow_status}')
-        while flow_status in ['ACTIVE', 'INACTIVE']:
-            time.sleep(10)
-            flow_action = fc.get_run(flow_run_id)
-            flow_status = flow_action['status']
-            logger.info(f'Updated flow status: {flow_status}')
-            # Log additional details about the flow status
-            logger.info(f'Flow action details: {flow_action}')
-
-        if flow_status != 'SUCCEEDED':
-            logger.error(f'Flow failed with status: {flow_status}')
-            # Log additional details about the failure
-            logger.error(f'Flow failure details: {flow_action}')
-        else:
-            logger.info(f'Flow completed successfully with status: {flow_status}')
-    except Exception as e:
-        logger.error(f"Error running flow: {e}")
-
 
 @task(name="transfer_spot_to_data")
 def transfer_spot_to_data(
@@ -148,8 +83,9 @@ def transfer_data_to_nersc(
 
     return success
 
-@task(name="transfer_data_alcf")
-def transfer_data_alcf(
+
+@task(name="transfer_data_to_alcf")
+def transfer_data_to_alcf(
         file_path: str,
         transfer_client: TransferClient,
         source_endpoint: GlobusEndpoint,
@@ -165,17 +101,13 @@ def transfer_data_alcf(
     """
     logger = get_run_logger()
 
-    # Prepare the transfer data
-    # if source_file begins with "/", it will mess up os.path.join
     if file_path[0] == "/":
         file_path = file_path[1:]
 
     source_path = os.path.join(source_endpoint.root_path, file_path)
     dest_path = os.path.join(destination_endpoint.root_path, file_path)
 
-    # Start the transfer
     try:
-        # transfer_result = transfer_client.submit_transfer(transfer_data)
         success = start_transfer(
             transfer_client,
             source_endpoint,
@@ -185,11 +117,87 @@ def transfer_data_alcf(
             max_wait_seconds=600,
             logger=logger,
         )
-        logger.info(f"Transfer submitted, task ID: {success['task_id']}")
+        if success:
+            logger.info("Transfer to ALCF completed successfully.")
+        else:
+            logger.error("Transfer to ALCF failed.")
         return success
     except globus_sdk.services.transfer.errors.TransferAPIError as e:
         logger.error(f"Failed to submit transfer: {e}")
         return False
+    
+
+@flow(name="alcf_tomopy_reconstruction_flow")
+def alcf_tomopy_reconstruction_flow():
+    logger = get_run_logger()
+    
+    # Initialize the Globus Compute Client
+    gcc = Client()
+    polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT") # COMPUTE endpoint, not TRANSFER endpoint
+    gce = Executor(endpoint_id=polaris_endpoint_id, client=gcc)
+
+    reconstruction_func = os.getenv("GLOBUS_RECONSTRUCTION_FUNC")
+    source_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
+    destination_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
+    
+    # Define the function inputs
+    # Rundir will need to be updated to the correct path for the expiremental data
+    function_inputs = {"rundir": "/eagle/IRIBeta/als/sea_shell_test"}
+
+    # Define the json flow
+    flow_input = {
+        "input": {
+        "source": {
+            "id": source_collection_endpoint,
+            "path": "/sea_shell_test"
+        },
+        "destination": {
+            "id": destination_collection_endpoint,
+            "path": "/bl832"
+        },
+        "recursive_tx": True,
+        "compute_endpoint_id": polaris_endpoint_id,
+        "compute_function_id": reconstruction_func,
+        "compute_function_kwargs": function_inputs
+        }
+    }
+    collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
+
+    # Flow ID (only generate once!)
+    flow_id = os.getenv("GLOBUS_FLOW_ID")
+
+    # Run the flow
+    fc = get_flows_client()
+    flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
+
+    try:
+        logger.info("Starting globus flow action")
+        flow_action = flow_client.run_flow(flow_input, label="ALS run", tags=["demo", "als", "tomopy"])
+        flow_run_id = flow_action['action_id']
+        logger.info( flow_action )
+        logger.info(f'Flow action started with id: {flow_run_id}')
+        logger.info(f"Monitor your flow here: https://app.globus.org/runs/{flow_run_id}")
+
+        # Monitor flow status
+        flow_status = flow_action['status']
+        logger.info(f'Initial flow status: {flow_status}')
+        while flow_status in ['ACTIVE', 'INACTIVE']:
+            time.sleep(10)
+            flow_action = fc.get_run(flow_run_id)
+            flow_status = flow_action['status']
+            logger.info(f'Updated flow status: {flow_status}')
+            # Log additional details about the flow status
+            logger.info(f'Flow action details: {flow_action}')
+
+        if flow_status != 'SUCCEEDED':
+            logger.error(f'Flow failed with status: {flow_status}')
+            # Log additional details about the failure
+            logger.error(f'Flow failure details: {flow_action}')
+        else:
+            logger.info(f'Flow completed successfully with status: {flow_status}')
+    except Exception as e:
+        logger.error(f"Error running flow: {e}")
+
 
 @flow(name="new_832_file_flow")
 def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=True, send_to_alcf=False):
@@ -197,6 +205,7 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
     Sends a file along a path:
         - Copy from spot832 to data832
         - Copy from data832 to NERSC
+        - Copy from NERSC to ALCF (if send_to_alcf is True), compute tomography, and copy back to NERSC
         - Ingest into SciCat
         - Schedule a job to delete from spot832 in the future
         - Schedule a job to delete from data832 in the future
@@ -223,24 +232,31 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
 
     logger.info(f"Transferring {file_path} to spot to data")
 
-    # Send data to ALCF (default is False), process it using Tomopy, and send back to NERSC
-    if not is_export_control and send_to_alcf:
-        # Call the task to transfer data
-        logger.info(f"Transferring {file_path} to ALCF")
 
-        transfer_success = transfer_data_alcf(file_path, config.tc, config.spot832, config.alcf_iribeta_cgs)
+    # Send data from NERSC to ALCF (default is False), process it using Tomopy, and send it back to NERSC
+    if not is_export_control and send_to_alcf:
+        # assume file_path is the name of the file without the extension, but it is an h5 file
+        # fp adds the .h5 extension back to the string (for the initial transfer to ALCF)
+        # ex: file_path = '20230224_132553_sea_shell'
+        fp = file_path + '.h5'
+        
+        # Transfer data from NERSC to ALCF
+        logger.info(f"Transferring {file_path} from NERSC to ALCF")
+        transfer_success = transfer_data_to_alcf(fp, config.tc, config.nersc_alsdev, config.alcf_iribeta_cgs)
         if not transfer_success:
             logger.error("Transfer failed due to configuration or authorization issues.")
         else:
             logger.info("Transfer successful.")
 
-        logger.info(f"Running ALCF tomopy reconstruction flow for {file_path} on ALCF")
+        logger.info(f"Running Tomopy reconstruction on {file_path} at ALCF")
+
+        # Run the Tomopy reconstruction flow
         alcf_tomopy_reconstruction_flow()
 
-        # Call the task to transfer data
+        # Send reconstructed data to NERSC
         logger.info(f"Transferring {file_path} from ALCF to NERSC")
-
-        transfer_success = transfer_data_alcf(file_path, config.tc, config.alcf_iribeta_cgs, config.nersc832)
+        file_path = '/bl832/rec' + file_path + '/'
+        transfer_success = transfer_data_to_nersc(file_path, config.tc, config.alcf_iribeta_cgs, config.nersc_alsdev)
         if not transfer_success:
             logger.error("Transfer failed due to configuration or authorization issues.")
         else:
@@ -319,6 +335,7 @@ def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
     logger.info(
         f"File successfully transferred from data832 to NERSC {spot832_path}. Task {task}"
     )
+    process_new_832_file(file_path, is_export_control=False, send_to_nersc=False, send_to_alcf=True)
 
 
-
+test_transfers_832('20230224_132553_sea_shell')

@@ -186,7 +186,7 @@ def alcf_tomopy_reconstruction_flow():
 
 
 @flow(name="new_832_file_flow")
-def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=False, send_to_alcf=True):
+def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=False, send_to_alcf=False):
     """
     Process and transfer a file from a source to the ALCF.
     Args:
@@ -201,11 +201,13 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
 
     config = Config832()
     
-    # Send data to ALCF (default is False) and process it using Tomopy
+    # Send data from NERSC to ALCF (default is False), process it using Tomopy, and send it back to NERSC
     if not is_export_control and send_to_alcf:
-        # Call the task to transfer data
-        file_path = '20230224_132553_sea_shell'
+        # assume file_path is the name of the file without the extension, but it is an h5 file
+        # fp adds the .h5 extension back to the string (for the initial transfer to ALCF)
         fp = file_path + '.h5'
+        
+        # Transfer data from NERSC to ALCF
         logger.info(f"Transferring {file_path} from NERSC to ALCF")
         transfer_success = transfer_data_to_alcf(fp, config.tc, config.nersc_alsdev, config.alcf_iribeta_cgs)
         if not transfer_success:
@@ -215,9 +217,10 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
 
         logger.info(f"Running Tomopy reconstruction on {file_path} at ALCF")
 
+        # Run the Tomopy reconstruction flow
         alcf_tomopy_reconstruction_flow()
 
-
+        # Send reconstructed data to NERSC
         logger.info(f"Transferring {file_path} from ALCF to NERSC")
         file_path = '/bl832/rec' + file_path + '/'
         transfer_success = transfer_data_to_nersc(file_path, config.tc, config.alcf_iribeta_cgs, config.nersc_alsdev)
@@ -225,18 +228,7 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
             logger.error("Transfer failed due to configuration or authorization issues.")
         else:
             logger.info("Transfer successful.")
-    
-
-        # # Call the task to transfer data
-        # logger.info(f"Transferring {file_path} from ALCF to NERSC")
-
-        # transfer_success = transfer_data_alcf(file_path, config.tc, config.alcf_iribeta_cgs, config.nersc_test)
-        # if not transfer_success:
-        #     logger.error("Transfer failed due to configuration or authorization issues.")
-        # else:
-        #     logger.info("Transfer successful.")
-        
+            
 if __name__ == "__main__":
-    file = Path("/Users/david/Documents/code/test.txt")
-    new_file = str(file.with_name(f"test_{str(uuid.uuid4())}.txt"))
+    new_file = str('20230224_132553_sea_shell')
     process_new_832_file(new_file, False, False, True)
