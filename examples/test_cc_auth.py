@@ -12,20 +12,8 @@ CLIENT_ID = os.getenv('GLOBUS_CLIENT_ID')
 CLIENT_SECRET = os.getenv('GLOBUS_CLIENT_SECRET')
 
 SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/d40248e6-d874-4f7b-badd-2c06c16f1a58/data_access]']
-ENDPOINT_ID = "d40248e6-d874-4f7b-badd-2c06c16f1a58" # NERSC DTN alsdev Collab
-
-# ENDPOINT_ID = "6bdc7956-fc0f-4ad2-989c-7aa5ee643a79"
-# SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/6bdc7956-fc0f-4ad2-989c-7aa5ee643a79/data_access]']
-
-# nersc_test:
-#   root_path: /global/cfs/cdirs/als/data_mover/share/dabramov/BLS-00564_dyparkinson/
-#   uri: nersc.gov
-#   uuid: 6bdc7956-fc0f-4ad2-989c-7aa5ee643a79
-#   name: nersc_test
-
-
-# ENDPOINT_ID = "d8f85a4f-bd79-45a7-90fb-f6d56d4fbbf2"
 # SCOPES = "urn:globus:auth:scope:transfer.api.globus.org:all"
+ENDPOINT_ID = "d40248e6-d874-4f7b-badd-2c06c16f1a58" # NERSC DTN alsdev Collab
 
 def initialize_transfer_client():
     confidential_client = globus_sdk.ConfidentialAppAuthClient(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)

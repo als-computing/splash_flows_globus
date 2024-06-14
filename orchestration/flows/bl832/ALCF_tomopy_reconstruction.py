@@ -12,42 +12,12 @@ import time
 import uuid
 from pprint import pprint
 
-# Load environment variables
-load_dotenv()
-
-@task(name="transfer_spot_to_data")
-def transfer_spot_to_data(
-    file_path: str,
-    transfer_client: TransferClient,
-    spot832: GlobusEndpoint,
-    data832: GlobusEndpoint,
-):
-    logger = get_run_logger()
-
-    # if source_file begins with "/", it will mess up os.path.join
-    if file_path[0] == "/":
-        file_path = file_path[1:]
-
-    source_path = os.path.join(spot832.root_path, file_path)
-    dest_path = os.path.join(data832.root_path, file_path)
-    success = start_transfer(
-        transfer_client,
-        spot832,
-        source_path,
-        data832,
-        dest_path,
-        max_wait_seconds=600,
-        logger=logger,
-    )
-    logger.info(f"spot832 to data832 globus task_id: {task}")
-    return success
-
 
 @task(name="transfer_data_to_nersc")
 def transfer_data_to_nersc(
     file_path: str,
     transfer_client: TransferClient,
-    data832: GlobusEndpoint,
+    source_endpoint: GlobusEndpoint,
     nersc832: GlobusEndpoint,
 ):
     logger = get_run_logger()
@@ -55,14 +25,14 @@ def transfer_data_to_nersc(
     # if source_file begins with "/", it will mess up os.path.join
     if file_path[0] == "/":
         file_path = file_path[1:]
-    source_path = os.path.join(data832.root_path, file_path)
+    source_path = os.path.join(source_endpoint.root_path, file_path)
     dest_path = os.path.join(nersc832.root_path, file_path)
 
-    logger.info(f"Transferring {dest_path} data832 to nersc")
+    logger.info(f"Transferring {dest_path} to nersc")
 
     success = start_transfer(
         transfer_client,
-        data832,
+        source_endpoint,
         source_path,
         nersc832,
         dest_path,
@@ -185,8 +155,8 @@ def alcf_tomopy_reconstruction_flow():
         logger.error(f"Error running flow: {e}")
 
 
-@flow(name="new_832_file_flow")
-def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=False, send_to_alcf=False):
+@flow(name="new_832_ALCF_flow")
+def process_new_832_ALCF_flow(file_path: str, is_export_control=False, send_to_nersc=False, send_to_alcf=True):
     """
     Process and transfer a file from a source to the ALCF.
     Args:
@@ -231,4 +201,4 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
             
 if __name__ == "__main__":
     new_file = str('20230224_132553_sea_shell')
-    process_new_832_file(new_file, False, False, True)
+    process_new_832_ALCF_flow(new_file, False, False, True)
