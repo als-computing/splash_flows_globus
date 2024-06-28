@@ -11,9 +11,10 @@ load_dotenv()
 CLIENT_ID = os.getenv('GLOBUS_CLIENT_ID')
 CLIENT_SECRET = os.getenv('GLOBUS_CLIENT_SECRET')
 
-SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/d40248e6-d874-4f7b-badd-2c06c16f1a58/data_access]']
-# SCOPES = "urn:globus:auth:scope:transfer.api.globus.org:all"
-ENDPOINT_ID = "d40248e6-d874-4f7b-badd-2c06c16f1a58" # NERSC DTN alsdev Collab
+# SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/55c3adf6-31f1-4647-9a38-52591642f7e7/data_access]']
+SCOPES = "urn:globus:auth:scope:transfer.api.globus.org:all"
+# ENDPOINT_ID = "d40248e6-d874-4f7b-badd-2c06c16f1a58" # NERSC DTN alsdev Collab
+ENDPOINT_ID = "55c3adf6-31f1-4647-9a38-52591642f7e7" #ALCF Iribeta CGS
 
 def initialize_transfer_client():
     confidential_client = globus_sdk.ConfidentialAppAuthClient(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
@@ -124,20 +125,22 @@ def main_flow():
     base_path = ""
 
     # Check permissions for the endpoint
-    check_permissions(transfer_client, endpoint_id)
+    # check_permissions(transfer_client, endpoint_id)
 
     # List the contents of the root directory
     logger = get_run_logger()
-    logger.info("Listing / directory:")
-    list_directory(transfer_client, endpoint_id, base_path)
+    # logger.info("Listing / directory:")
+    # list_directory(transfer_client, endpoint_id, base_path)
 
     # Create a new directory in the root directory
-    new_directory_name = "test_directory/"
-    create_directory(transfer_client, endpoint_id, base_path, new_directory_name)
+    # new_directory_name = "test/"
+    # create_directory(transfer_client, endpoint_id, base_path, new_directory_name)
+
+    remove_directory(transfer_client, endpoint_id, "bl832_test/")
 
     # List the contents again to verify the new directory
-    logger.info(f"\nListing / directory after creating {new_directory_name}:")
-    list_directory(transfer_client, endpoint_id, base_path)
+    # logger.info(f"\nListing / directory after creating {new_directory_name}:")
+    # list_directory(transfer_client, endpoint_id, base_path+new_directory_name)
 
 if __name__ == "__main__":
     main_flow()
