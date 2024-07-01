@@ -182,6 +182,3 @@ def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
     logger.info(
         f"File successfully transferred from data832 to NERSC {spot832_path}. Task {task}"
     )
-
-
-

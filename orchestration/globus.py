@@ -107,7 +107,13 @@ def start_transfer(
         label=label,
         sync_level="checksum",
     )
-    tdata.add_item(source_file, dest_path)
+    if source_path.is_dir():
+        # Add directory contents recursively
+        for item in source_path.rglob('*'):
+            relative_path = item.relative_to(source_path.parent)
+            tdata.add_item(str(item), os.path.join(dest_path, str(relative_path)))
+    else:
+        tdata.add_item(source_file, dest_path)
     logger.info(
         f"starting transfer {source_endpoint.uri}:{source_file} to {dest_endpoint.uri}:{dest_path}"
     )
