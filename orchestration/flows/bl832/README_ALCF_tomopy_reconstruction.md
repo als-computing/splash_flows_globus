@@ -10,12 +10,12 @@ Follow these steps to log in to ALCF Polaris, start a Globus compute endpoint si
 ```mermaid
 graph TD
     A[Beamline 8.3.2] -->|Collect Data| B[spot832]
-    B -->|Transfer to NERSC| C[ /global/cfs/cdirs/als/data_mover/8.3.2/raw/< proposal folder name convention>/< h5 files>]
-    C -->|Start This Prefect Flow| D[ start ALCF_tomopy_reconstruction.py ]
-    D -->|Step 1: Transfer from NERSC to ALCF| E[ /eagle/IRIBeta/als/bl832/raw/< proposal folder name convention>/< h5 files>]
+    B -->|Transfer to NERSC| C[ /global/cfs/cdirs/als/data_mover/8.3.2/raw/< experiment folder name convention>/< h5 files>]
+    C -->|Start This Prefect Flow| D[ python -m orchestration.flows.bl832.ALCF_tomopy_reconstruction ]
+    D -->|Step 1: Transfer from NERSC to ALCF| E[ /eagle/IRIBeta/als/bl832/raw/< experiment folder name convention>/< h5 files>]
     E -->|Step 2: Tomography Reconstruction Globus Flow| F[ run reconstruction.py on ALCF globus-compute-endpoint]
-    F -->|Save Reconstruction on ALCF| G[ /eagle/IRIBeta/als/bl832/scratch/< proposal folder name convention>/rec< dataset>/< tiffs> ]
-    G -->|Step 3. Transfer back to NERSC| H[ /global/cfs/cdirs/als/data_mover/8.3.2/scratch/< folder name convention>/rec< dataset>/< tiffs>]
+    F -->|Save Reconstruction on ALCF| G[ /eagle/IRIBeta/als/bl832/scratch/< experiment folder name convention>/rec< dataset>/< tiffs> ]
+    G -->|Step 3. Transfer back to NERSC| H[ /global/cfs/cdirs/als/data_mover/8.3.2/scratch/< experiment folder name convention>/rec< dataset>/< tiffs>]
 	
 	classDef compute fill:#80CED7,stroke:#3B6064,stroke-width:4px;
 	class D,F compute;
@@ -30,7 +30,7 @@ graph TD
 
 ### File flow details
 **Naming conventions**
--   Proposal folder name:
+-   Experiment folder name:
 	- `< Proposal Prefix>-< 5 digit proposal number>_< first part of email address>/`
 -   h5 files in experiment folder:
 	- `< YYYYMMDD>_< HHMMSS>_< user defined string>.h5`
@@ -38,16 +38,16 @@ graph TD
 	- `< YYYYMMDD>_< HHMMSS>_< user defined string>_x<##>y<##>.h5`
 
 **NERSC Raw Location**
--  `/global/cfs/cdirs/als/data_mover/8.3.2/raw/< proposal folder name convention>/< h5 files>`
+-  `/global/cfs/cdirs/als/data_mover/8.3.2/raw/< Experiment folder name convention>/< h5 files>`
 
 **ALCF Raw Destination**
-- `/eagle/IRIBeta/als/bl832/raw/< proposal folder name convention>/< h5 files>`
+- `/eagle/IRIBeta/als/bl832/raw/< Experiment folder name convention>/< h5 files>`
 
 **ALCF Recon Destination**
-- `/eagle/IRIBeta/als/bl832/scratch/< proposal folder name convention>/rec< dataset>/< tiffs>`
+- `/eagle/IRIBeta/als/bl832/scratch/< Experiment folder name convention>/rec< dataset>/< tiffs>`
 
 **NERSC Destination**
--  `/global/cfs/cdirs/als/data_mover/8.3.2/scratch/< proposal folder name convention>/rec< dataset>/< tiffs>`
+-  `/global/cfs/cdirs/als/data_mover/8.3.2/scratch/< Experiment folder name convention>/rec< dataset>/< tiffs>`
 	-   Prune reconstruction (NERSC) after 1 week
 
 **Next steps:**
@@ -159,6 +159,7 @@ GLOBUS_IRIBETA_CGS_ENDPOINT="< IRIBeta_als guest collection UUID on Globus >"
 5. **Start globus-compute `tomopy` environment and activate the endpoint**
 		On Polaris, enter the following commands to activate a Conda environment that has been set up to run reconstruction using `tomopy` and `globus-compute-endpoint`.
 	```bash
+	module use /soft/modulefiles
 	module  load  conda
 	conda  activate  /eagle/IRIBeta/als/env/tomopy
 	globus-compute-endpoint  configure  --endpoint-config  template_config.yaml  als_endpoint
