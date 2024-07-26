@@ -1,16 +1,15 @@
+from globus_sdk import ConfidentialAppAuthClient, ClientCredentialsAuthorizer, TransferClient
 import logging
-
-from prefect import flow, get_run_logger
-from prefect.blocks.system import JSON
-
-from orchestration.globus import (
+from orchestration.flows.bl832.config import Config832
+from orchestration.globus.transfer import (
     # get_files,
     # get_globus_file_object,
     # is_globus_file_older,
     # prune_files,
     prune_one_safe,
 )
-from orchestration.flows.bl832.config import Config832
+from prefect import flow, task, get_run_logger
+from prefect.blocks.system import JSON, Secret
 
 
 logger = logging.getLogger(__name__)
@@ -68,6 +67,60 @@ def prune_data832(relative_path: str):
         config.tc,
         config.data832,
         config.nersc832,
+        logger=p_logger,
+        max_wait_seconds=max_wait_seconds,
+    )
+
+
+@flow(name="prune_alcf832_raw")
+def prune_alcf832_raw(relative_path: str):
+    p_logger = get_run_logger()
+    config = Config832()
+    pruning_config = JSON.load("pruning-config").value
+    max_wait_seconds = pruning_config["max_wait_seconds"]
+    p_logger.info(f"Pruning {relative_path} from {config.alcf832_raw}")
+    prune_one_safe(
+        file=relative_path,
+        if_older_than_days=0,
+        tranfer_client=config.tc,
+        source_endpoint=config.alcf832_raw,
+        check_endpoint=config.nersc832_alsdev_raw,
+        logger=p_logger,
+        max_wait_seconds=max_wait_seconds,
+    )
+
+
+@flow(name="prune_alcf832_scratch")
+def prune_alcf832_scratch(relative_path: str):
+    p_logger = get_run_logger()
+    config = Config832()
+    pruning_config = JSON.load("pruning-config").value
+    max_wait_seconds = pruning_config["max_wait_seconds"]
+    p_logger.info(f"Pruning {relative_path} from {config.alcf832_scratch}")
+    prune_one_safe(
+        file=relative_path,
+        if_older_than_days=0,
+        tranfer_client=config.tc,
+        source_endpoint=config.alcf832_scratch,
+        check_endpoint=config.nersc832_alsdev_scratch,
+        logger=p_logger,
+        max_wait_seconds=max_wait_seconds,
+    )
+
+
+@flow(name="prune_nersc832_alsdev_scratch")
+def prune_nersc832_alsdev_scratch(relative_path: str):
+    p_logger = get_run_logger()
+    config = Config832()
+    pruning_config = JSON.load("pruning-config").value
+    max_wait_seconds = pruning_config["max_wait_seconds"]
+    p_logger.info(f"Pruning {relative_path} from {config.nersc832_alsdev_scratch}")
+    prune_one_safe(
+        file=relative_path,
+        if_older_than_days=0,
+        tranfer_client=config.tc,
+        source_endpoint=config.nersc832_alsdev_scratch,
+        check_endpoint=None, #config.data832,
         logger=p_logger,
         max_wait_seconds=max_wait_seconds,
     )

@@ -4,10 +4,8 @@ from dateutil import parser
 import logging
 import os
 from pathlib import Path
-from time import time
+from time import time, sleep
 from typing import Dict, List
-
-
 from dotenv import load_dotenv
 from globus_sdk import (
     ClientCredentialsAuthorizer,
@@ -15,14 +13,13 @@ from globus_sdk import (
     DeleteData,
     TransferClient,
     TransferData,
+    GlobusAPIError
 )
-
-from .config import get_config
+from prefect import flow, task, get_run_logger
+from prefect.blocks.system import JSON, Secret
+from ..config import get_config
 
 load_dotenv()
-
-GLOBUS_CLIENT_ID = os.getenv("GLOBUS_CLIENT_ID")
-GLOBUS_CLIENT_SECRET = os.getenv("GLOBUS_CLIENT_SECRET")
 
 logger = logging.getLogger("data_mover.globus")
 
@@ -77,12 +74,16 @@ def build_apps(config: Dict) -> Dict[str, GlobusEndpoint]:
         apps[app_name] = GlobusApp(app_config["client_id"], app_config["client_secret"])
     return apps
 
-
+@task
 def init_transfer_client(app: GlobusApp) -> TransferClient:
+    logger = get_run_logger()
+    # Get the client id and secret from Prefect Secret Blocks
+    GLOBUS_CLIENT_ID = Secret.load("globus-client-id")
+    GLOBUS_CLIENT_SECRET = Secret.load("globus-client-secret")
+    logger.info(f"Globus client id: {GLOBUS_CLIENT_ID}")
     confidential_client = ConfidentialAppAuthClient(
-        client_id=app.client_id, client_secret=app.client_secret
+        client_id=GLOBUS_CLIENT_ID.get(), client_secret=GLOBUS_CLIENT_SECRET.get()
     )
-
     scopes = "urn:globus:auth:scope:transfer.api.globus.org:all"
     cc_authorizer = ClientCredentialsAuthorizer(confidential_client, scopes)
     # create a new client
@@ -186,17 +187,63 @@ def prune_files(
     max_wait_seconds=600,
     logger=logger,
 ):
-    ddata = DeleteData(transfer_client, endpoint.uuid)
-    logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
-    for file in files:
-        file_path = endpoint.full_path(file)
-        ddata.add_item(file_path)
-    delete_result = transfer_client.submit_delete(ddata)
-    task_id = delete_result["task_id"]
-    task_wait(
-        transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
-    )
-    logger.info(f"delete_result {delete_result}")
+    start_time = time()
+    print("transfer_client", transfer_client)
+    print("endpoint", endpoint)
+    print("endpoint.uuid", endpoint.uuid)
+    print("files", files)
+    
+    try:
+        ddata = DeleteData(transfer_client=transfer_client, endpoint=endpoint.uuid, recursive=True)
+        logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
+        for file in files:
+            logger.info(f"deleting {file}")
+            print(file)
+            file_path = endpoint.full_path(file)
+            # print("{endpoint.root_path}/{file}")
+            ddata.add_item(file_path)
+        delete_result = transfer_client.submit_delete(ddata)
+        task_id = delete_result["task_id"]
+        print("delete_result", delete_result)
+        print("task_id", task_id)
+        # task_wait(
+        #     transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
+        # )
+        print("deleted")
+        logger.info(f"delete_result {delete_result}")
+    except GlobusAPIError as err:
+        logger.error(f"Error removing directory {files} in endpoint {endpoint.uri}: {err.message}")
+        if err.info.consent_required:
+            logger.error(f"Got a ConsentRequired error with scopes: {err.info.consent_required.required_scopes}")
+        elif err.code == "PermissionDenied":
+            logger.error(f"Permission denied for removing directory {files}. Ensure proper permissions are set.")
+        elif err.http_status == 500:
+            logger.error(f"Server error when removing directory {files} in endpoint {endpoint.uri}.")
+        else:
+            logger.error(f"An unexpected error occurred: {err}")
+
+    finally:
+        elapsed_time = time() - start_time
+        logger.info(f"prune_files task took {elapsed_time:.2f} seconds")
+        return task_id
+
+
+# Function to monitor the delete task
+def monitor_task(transfer_client, task_id):
+    while True:
+        task = transfer_client.get_task(task_id)
+        status = task["status"]
+        print(f"Task {task_id} status: {status}")
+        print(task)
+        
+        if status == "FAILED":
+            error_message = task
+            print(f"Task {task_id} failed with error: {error_message}")
+            break
+        elif status in ["SUCCEEDED", "CANCELED"]:
+            break
+        
+        sleep(5)  # Wait for 5 seconds before checking again
 
 
 def rename(
@@ -258,9 +305,12 @@ def prune_one_safe(
     logger.info(f"file: {file} found on {source_endpoint.uri}")
 
     # does the file exist at the check endpoint?
-    g_file_obj = get_globus_file_object(tranfer_client, check_endpoint, file)
-    assert g_file_obj is not None, f"file not found {check_endpoint.uri}"
-    logger.info(f"file: {file} found on {check_endpoint.uri}")
+    if check_endpoint is None:
+        logger.info("No check endpoint provided, skipping check")
+    else:
+        g_file_obj = get_globus_file_object(tranfer_client, check_endpoint, file)
+        assert g_file_obj is not None, f"file not found {check_endpoint.uri}"
+        logger.info(f"file: {file} found on {check_endpoint.uri}")
 
     if if_older_than_days > 0:
         # is the file older than the days asked for?
@@ -274,29 +324,49 @@ def prune_one_safe(
     else:
         logger.info("Not checking dates, sent if_older_than_days==0")
 
-    prune_files(
+    delete_id = prune_files(
         tranfer_client,
         source_endpoint,
         [file],
         max_wait_seconds=max_wait_seconds,
         logger=logger,
     )
+
+    monitor_task(tranfer_client, delete_id)
     logger.info(f"file deleted from: {source_endpoint.uri}")
 
 
 if __name__ == "__main__":
-    config = get_config()
-    endpoints = build_endpoints(config)
-    apps = build_apps(config)
-    tc = init_transfer_client(apps["als_transfer"])
-    source_ep = endpoints["spot832"]
-    dest_ep = endpoints["data832"]
-    task_id = start_transfer(
-        tc,
-        source_ep,
-        "/raw/dmcreynolds/test2.txt",
-        dest_ep,
-        "/data/raw/dmcreynolds/test2.txt",
-    )
-    while not tc.task_wait(task_id, timeout=5):
-        print("Another second went by without {0} terminating".format(task_id))
+    from orchestration.flows.bl832.config import Config832
+    import pickle
+    config = Config832()
+
+    # endpoints = build_endpoints(config)
+    # apps = build_apps(config)
+    # tc = init_transfer_client(apps["als_transfer"])
+    # source_ep = endpoints["spot832"]
+    # dest_ep = endpoints["data832"]
+    # task_id = start_transfer(
+    #     tc,
+    #     source_ep,
+    #     "/raw/dmcreynolds/test2.txt",
+    #     dest_ep,
+    #     "/data/raw/dmcreynolds/test2.txt",
+    # )
+    # while not tc.task_wait(task_id, timeout=5):
+    #     print("Another second went by without {0} terminating".format(task_id))
+
+    # tc = None
+    # try:
+    #     with open("transfer_client.pkl", "rb") as f:
+    #         tc = pickle.load(f)
+    # except:
+    #     if tc is None:
+    #         tc = initialize_transfer_client() #pickle to disk
+    #         with open("transfer_client.pkl", "wb") as f:
+    #             pickle.dump(tc, f)
+
+
+    
+    # delete_id = prune_files(tc, config.alcf832_scratch, ["/bl832_test/scratch/BLS-00564_dyparkinson/rec20230224_132553_sea_shell.zarr/"])
+    # monitor_task(tc, delete_id)

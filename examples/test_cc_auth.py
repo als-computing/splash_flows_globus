@@ -16,10 +16,12 @@ SCOPES = "urn:globus:auth:scope:transfer.api.globus.org:all"
 # ENDPOINT_ID = "d40248e6-d874-4f7b-badd-2c06c16f1a58" # NERSC DTN alsdev Collab
 ENDPOINT_ID = "55c3adf6-31f1-4647-9a38-52591642f7e7" #ALCF Iribeta CGS
 
+
 def initialize_transfer_client():
     confidential_client = globus_sdk.ConfidentialAppAuthClient(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
     cc_authorizer = globus_sdk.ClientCredentialsAuthorizer(confidential_client, SCOPES)
     return globus_sdk.TransferClient(authorizer=cc_authorizer)
+
 
 @task
 def check_permissions(transfer_client, endpoint_id):
@@ -33,6 +35,7 @@ def check_permissions(transfer_client, endpoint_id):
     except globus_sdk.GlobusAPIError as err:
         logger.error(f"Error fetching endpoint information: {err.message}")
         raise
+
 
 @task
 def list_directory(transfer_client, endpoint_id, path):
@@ -95,6 +98,7 @@ def create_directory(transfer_client, endpoint_id, base_path, directory_name):
         elapsed_time = time.time() - start_time
         logger.info(f"create_directory task took {elapsed_time:.2f} seconds")
 
+
 @task
 def remove_directory(transfer_client, endpoint_id, path):
     logger = get_run_logger()
@@ -118,6 +122,7 @@ def remove_directory(transfer_client, endpoint_id, path):
         elapsed_time = time.time() - start_time
         logger.info(f"remove_directory task took {elapsed_time:.2f} seconds")
 
+
 @flow
 def main_flow():
     transfer_client = initialize_transfer_client()
@@ -125,7 +130,7 @@ def main_flow():
     base_path = ""
 
     # Check permissions for the endpoint
-    # check_permissions(transfer_client, endpoint_id)
+    check_permissions(transfer_client, endpoint_id)
 
     # List the contents of the root directory
     logger = get_run_logger()
@@ -136,7 +141,7 @@ def main_flow():
     # new_directory_name = "test/"
     # create_directory(transfer_client, endpoint_id, base_path, new_directory_name)
 
-    remove_directory(transfer_client, endpoint_id, "bl832_test/")
+    remove_directory(transfer_client, endpoint_id, "bl832_test/scratch/BLS-00564_dyparkinson/")
 
     # List the contents again to verify the new directory
     # logger.info(f"\nListing / directory after creating {new_directory_name}:")

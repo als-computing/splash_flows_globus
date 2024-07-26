@@ -10,7 +10,7 @@ from prefect.blocks.system import Secret
 
 from orchestration.flows.scicat.ingest import ingest_dataset
 from orchestration.flows.bl832.config import Config832
-from orchestration.globus import GlobusEndpoint, start_transfer
+from orchestration.globus.transfer import GlobusEndpoint, start_transfer
 from orchestration.prefect import schedule_prefect_flow
 
 

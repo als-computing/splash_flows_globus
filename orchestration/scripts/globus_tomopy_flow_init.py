@@ -1,6 +1,6 @@
 from dotenv import load_dotenv, set_key
 from globus_compute_sdk import Client, Executor
-from orchestration.globus_flows_utils import get_flows_client, get_specific_flow_client
+from orchestration.globus.flows import get_flows_client, get_specific_flow_client
 
 
 """
@@ -84,7 +84,7 @@ def create_flow_definition():
 if __name__ == "__main__":
     gc = Client()
     dotenv_file = load_dotenv()
-    polaris_endpoint_id = "3e0b1459-e007-4c70-a5db-ea625a4cb3bf"
+    polaris_endpoint_id = "UUID"
     gce = Executor(endpoint_id=polaris_endpoint_id)
     future = gce.submit(reconstruction_wrapper, "/eagle/IRIBeta/als/example")
     # print(future.result())

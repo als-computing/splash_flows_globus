@@ -6,7 +6,7 @@ from prefect import get_run_logger, task
 from prefect import get_client
 
 from prefect.states import Scheduled
-
+import pytz
 
 logger = logging.getLogger("orchestration.prefect")
 
@@ -23,7 +23,9 @@ async def schedule(
         assert (
             deployment
         ), f"No deployment found in config for deploymnent_name {deploymnent_name}"
-        date_time_tz = datetime.datetime.now() + duration_from_now
+        timezone = pytz.timezone("America/Los_Angeles")  # Adjust the timezone as needed
+        now = datetime.datetime.now(timezone)
+        date_time_tz = now + duration_from_now
         await client.create_flow_run_from_deployment(
             deployment.id,
             state=Scheduled(scheduled_time=date_time_tz),

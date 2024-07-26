@@ -6,7 +6,7 @@ import uuid
 from globus_sdk import TransferClient
 from prefect import flow, task, get_run_logger
 from orchestration.flows.bl7012.config import Config7012
-from orchestration.globus import GlobusEndpoint, start_transfer
+from orchestration.globus.transfer import GlobusEndpoint, start_transfer
 
 # from acme_data_cleaning import nersc
 
