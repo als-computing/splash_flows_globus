@@ -121,7 +121,7 @@ def transfer_data_to_nersc(
     return success
 
 
-@task
+@task(name="transfer_data_to_data832")
 def transfer_data_to_data832(
     file_path: str,
     transfer_client: TransferClient,
@@ -161,8 +161,8 @@ def transfer_data_to_data832(
     return success
 
 
-@task
-def schedule_prune_task(path: str, location: str, schedule_days: datetime.timedelta) -> None:
+@task(name="schedule_prune_task")
+def schedule_prune_task(path: str, location: str, schedule_days: datetime.timedelta) -> bool:
     """
     Schedules a Prefect flow to prune files from a specified location.
 
@@ -171,13 +171,19 @@ def schedule_prune_task(path: str, location: str, schedule_days: datetime.timede
         location (str): The server location (e.g., 'alcf832_raw', 'alc832f_scratch') from where the files will be pruned.
         schedule_days (int): The number of days after which the file should be deleted.
     """
-    flow_name = f"delete {location}: {Path(path).name}"
-    schedule_prefect_flow(
-        deploymnent_name=f"prune_{location}/prune_{location}",
-        flow_run_name=flow_name,
-        parameters={"relative_path": path},
-        duration_from_now=schedule_days
-    )
+    try:
+        flow_name = f"delete {location}: {Path(path).name}"
+        schedule_prefect_flow(
+            deploymnent_name=f"prune_{location}/prune_{location}",
+            flow_run_name=flow_name,
+            parameters={"relative_path": path},
+            duration_from_now=schedule_days
+        )
+        return True
+    except Exception as e:
+        logger = get_run_logger()
+        logger.error(f"Failed to schedule prune task: {e}")
+        return False
 
 
 @task(name="schedule_pruning")
@@ -189,7 +195,7 @@ def schedule_pruning(
     nersc_scratch_path_zarr: str = None,
     data832_scratch_path: str = None,
     one_minute: bool = False
-    ) -> None:
+    ) -> bool:
     """
     This function schedules the deletion of files from specified locations on ALCF, NERSC, and data832.
 
@@ -231,6 +237,8 @@ def schedule_pruning(
             logger.info(f"Scheduled delete from {location} at {days} days")
         else:
             logger.info(f"Path not provided for {location}, skipping scheduling of deletion task.")
+
+    return True
 
 
 @flow(name="alcf_tomopy_reconstruction_flow")
@@ -445,5 +453,4 @@ if __name__ == "__main__":
     folder_name = str('BLS-00564_dyparkinson')
     file_name = str('20230224_132553_sea_shell')
     flow_success = process_new_832_ALCF_flow(folder_name=folder_name, file_name=file_name, is_export_control=False, send_to_alcf=True)
-    
     print(flow_success)
