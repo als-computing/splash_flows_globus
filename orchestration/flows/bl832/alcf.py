@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import JSON
+from pydantic import BaseModel
 import time
 
 
@@ -102,23 +103,28 @@ def transfer_data_to_nersc(
     # Start the timer
     start_time = time.time()
 
-    success = start_transfer(
-        transfer_client,
-        source_endpoint,
-        source_path,
-        nersc832,
-        dest_path,
-        max_wait_seconds=600,
-        logger=logger,
-    )
-
-    # Stop the timer and calculate the duration
-    elapsed_time = time.time() - start_time
-
-    # Log the elapsed time
-    logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
-
-    return success
+    try:
+        success = start_transfer(
+            transfer_client,
+            source_endpoint,
+            source_path,
+            nersc832,
+            dest_path,
+            max_wait_seconds=600,
+            logger=logger,
+        )
+        if success:
+            logger.info("Transfer to NERSC completed successfully.")
+        else:
+            logger.error("Transfer to NERSC failed.")
+        return success
+    except globus_sdk.services.transfer.errors.TransferAPIError as e:
+        logger.error(f"Failed to submit transfer: {e}")
+        return False
+    finally:
+        # Stop the timer and calculate the duration
+        elapsed_time = time.time() - start_time
+        logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
 
 
 @task(name="transfer_data_to_data832")
@@ -148,17 +154,28 @@ def transfer_data_to_data832(
 
     source_path = os.path.join(source_endpoint.root_path, file_path)
     dest_path = os.path.join(data832.root_path, file_path)
-    success = start_transfer(
-        transfer_client,
-        source_endpoint,
-        source_path,
-        data832,
-        dest_path,
-        max_wait_seconds=600,
-        logger=logger,
-    )
-    logger.info(f"{source_endpoint} to data832 globus task_id: {task}")
-    return success
+
+    start_time = time.time()
+
+    try:
+        success = start_transfer(
+            transfer_client,
+            source_endpoint,
+            source_path,
+            data832,
+            dest_path,
+            max_wait_seconds=600,
+            logger=logger,
+        )
+        logger.info(f"{source_endpoint} to data832 globus task_id: {task}")
+        return success
+    except globus_sdk.services.transfer.errors.TransferAPIError as e:
+        logger.error(f"Failed to submit transfer: {e}")
+        return False
+    finally:
+        # Stop the timer and calculate the duration
+        elapsed_time = time.time() - start_time
+        logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
 
 
 @task(name="schedule_prune_task")
@@ -272,44 +289,51 @@ def alcf_tomopy_reconstruction_flow(
     function_inputs = {"rundir": "/eagle/IRIBeta/als/bl832_test/raw", "h5_file_name": file_name, "folder_path": folder_name}
 
     # Define the json flow
-    flow_input = {
-        "input": {
-            "source": {
-                "id": source_collection_endpoint,
-                "path": raw_path
-            },
-            "destination": {
-                "id": destination_collection_endpoint,
-                "path": scratch_path
-            },
-            "recursive_tx": True,
-            "compute_endpoint_id": polaris_endpoint_id,
-            "compute_function_id": reconstruction_func,
-            "compute_function_kwargs": function_inputs
-        }
-    }
-    collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
+    class FlowInput(BaseModel):
+        source: dict
+        destination: dict
+        recursive_tx: bool
+        compute_endpoint_id: str
+        compute_function_id: str
+        compute_function_kwargs: dict
+
+    flow_input = FlowInput(
+        source={
+            "id": source_collection_endpoint,
+            "path": raw_path
+        },
+        destination={
+            "id": destination_collection_endpoint,
+            "path": scratch_path
+        },
+        recursive_tx=True,
+        compute_endpoint_id=polaris_endpoint_id,
+        compute_function_id=reconstruction_func,
+        compute_function_kwargs=function_inputs
+    )
+
+    collection_ids = [flow_input.source["id"], flow_input.destination["id"]]
 
     # Flow ID (only generate once!)
     flow_id = os.getenv("GLOBUS_FLOW_ID")
 
-    print(f"reconstruction_func: {reconstruction_func}")
-    print(f"flow_id: {flow_id}")
+    logger.info(f"reconstruction_func: {reconstruction_func}")
+    logger.info(f"flow_id: {flow_id}")
 
     # Start the timer
     start_time = time.time()
 
     # Run the flow
-    fc = get_flows_client()
-    flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
+    flow_client = get_flows_client()
+    specific_flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
 
     success = False
 
     try:
         logger.info("Starting globus flow action")
-        flow_action = flow_client.run_flow(flow_input, label="ALS run", tags=["demo", "als", "tomopy"])
+        flow_action = specific_flow_client.run_flow(flow_input.dict(), label="ALS run", tags=["demo", "als", "tomopy"])
         flow_run_id = flow_action['action_id']
-        logger.info( flow_action )
+        logger.info(flow_action)
         logger.info(f'Flow action started with id: {flow_run_id}')
         logger.info(f"Monitor your flow here: https://app.globus.org/runs/{flow_run_id}")
 
@@ -318,7 +342,7 @@ def alcf_tomopy_reconstruction_flow(
         logger.info(f'Initial flow status: {flow_status}')
         while flow_status in ['ACTIVE', 'INACTIVE']:
             time.sleep(10)
-            flow_action = fc.get_run(flow_run_id)
+            flow_action = flow_client.get_run(flow_run_id)
             flow_status = flow_action['status']
             logger.info(f'Updated flow status: {flow_status}')
             # Log additional details about the flow status

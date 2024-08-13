@@ -79,6 +79,7 @@ def get_specific_flow_client(flow_id, collection_ids=None):
     flow_scopes = flow_scopes[2].make_mutable("user")
 
     flows_authorizer = ClientCredentialsAuthorizer(confidential_client, flow_scopes)
+    # could monkeypatch the init function for ClientCredentialsAuthorizer with my own function
     flow_client = SpecificFlowClient(flow_id, authorizer=flows_authorizer)
 
     # Request token for Transfer scopes
