@@ -1,13 +1,12 @@
-globus_compute_sdk
 globus-sdk>=3.0
 h5py
 httpx>=0.22.0
 numpy
 pillow
 python-dotenv
-prefect
+prefect==2.14.3
 pyscicat @ git+https://github.com/dylanmcreynolds/pyscicat@fix_auth
 pyyaml
 authlib
 sfapi_client
-websockets
+globus_compute_sdk
