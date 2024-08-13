@@ -10,3 +10,4 @@ pyscicat @ git+https://github.com/dylanmcreynolds/pyscicat@fix_auth
 pyyaml
 authlib
 sfapi_client
+websockets==12.0
