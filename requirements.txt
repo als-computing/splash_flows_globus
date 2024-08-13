@@ -5,9 +5,9 @@ httpx>=0.22.0
 numpy
 pillow
 python-dotenv
-prefect==2.19.5
+prefect
 pyscicat @ git+https://github.com/dylanmcreynolds/pyscicat@fix_auth
 pyyaml
 authlib
 sfapi_client
-websockets==12.0
+websockets
