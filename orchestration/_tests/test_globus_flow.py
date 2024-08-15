@@ -178,11 +178,11 @@ def test_process_new_832_ALCF_flow(monkeypatch):
 
     monkeypatch.setattr(ClientCredentialsAuthorizer, "_get_new_access_token", mock_get_new_access_token)
 
-    # Mock the Client to avoid real network calls
+    # Mock the Client to avoid real network calls and login flow
     with patch.object(Client, 'version_check', return_value=None):
-        # Now call the function under test
-        result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+        with patch.object(Client, '__init__', return_value=None):
+            result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
 
-        # Assert the expected results
-        assert isinstance(result, list), "Result should be a list"
-        assert result == [True, True, True], "Result does not match expected values"
+            # Assert the expected results
+            assert isinstance(result, list), "Result should be a list"
+            assert result == [True, True, True], "Result does not match expected values"
