@@ -3,7 +3,7 @@ import warnings
 import pytest
 from unittest.mock import MagicMock, patch
 from typing import List, Optional, Dict, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from orchestration.flows.bl832.alcf import (
     process_new_832_ALCF_flow
 )
@@ -36,9 +36,9 @@ def prefect_test_fixture():
 
 @pytest.fixture(autouse=True)
 def set_env_vars(monkeypatch):
-    monkeypatch.setenv("GLOBUS_COMPUTE_ENDPOINT", "mock_compute_endpoint_id")
-    monkeypatch.setenv("GLOBUS_RECONSTRUCTION_FUNC", "mock_reconstruction_func_id")
-    monkeypatch.setenv("GLOBUS_IRIBETA_CGS_ENDPOINT", "mock_iribeta_cgs_endpoint_id")
+    monkeypatch.setenv("GLOBUS_COMPUTE_ENDPOINT", uuid4())
+    monkeypatch.setenv("GLOBUS_RECONSTRUCTION_FUNC", uuid4())
+    monkeypatch.setenv("GLOBUS_IRIBETA_CGS_ENDPOINT", uuid4())
 
 # Define models using Pydantic for better validation and type checking
 class FlowDefinition(BaseModel):
