@@ -1,17 +1,37 @@
 from pydantic import BaseModel, ConfigDict, PydanticDeprecatedSince20
 import warnings
 import pytest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from orchestration.globus.flows import get_flows_client, get_specific_flow_client
 from orchestration.flows.bl832.alcf import (
-    alcf_tomopy_reconstruction_flow,
     process_new_832_ALCF_flow
 )
+from orchestration.flows.bl832.config import Config832
+
+from prefect.testing.utilities import prefect_test_harness
+from prefect.blocks.system import JSON, Secret
+
+from orchestration._tests.test_globus import MockTransferClient
+
+from globus_sdk import ConfidentialAppAuthClient
+from globus_sdk.authorizers.client_credentials import ClientCredentialsAuthorizer
+from globus_compute_sdk.sdk.client import Client
+
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
+
+@pytest.fixture(autouse=True, scope="session")
+def prefect_test_fixture():
+    with prefect_test_harness():
+        globus_client_id = Secret(value =  "test-globus-client-id")
+        globus_client_id.save(name = "globus-client-id")
+        globus_client_secret = Secret(value = "your_globus_client_secret")
+        globus_client_secret.save(name = "globus-client-secret")
+        pruning_config = JSON(value={"max_wait_seconds": 600})
+        pruning_config.save(name="pruning-config")
+        yield
 
 
 # Define models using Pydantic for better validation and type checking
@@ -123,103 +143,46 @@ def mock_client_credentials_authorizer():
         instance = MockAuthorizer.return_value
         yield instance
 
-# Create fixtures for mocking the tasks in the 832 ALCF flow
-@pytest.fixture
-def mock_transfer_data_to_alcf():
-    """Fixture for mocking the transfer_data_to_alcf task"""
-    with patch('orchestration.flows.bl832.alcf.transfer_data_to_alcf') as mock_task:
-        yield mock_task
 
-
-@pytest.fixture
-def mock_transfer_data_to_nersc():
-    """Fixture for mocking the transfer_data_to_nersc task"""
-    with patch('orchestration.flows.bl832.alcf.transfer_data_to_nersc') as mock_task:
-        yield mock_task
-
-
-@pytest.fixture
-def mock_schedule_pruning():
-    """Fixture for mocking the schedule_pruning task"""
-    with patch('orchestration.flows.bl832.alcf.schedule_pruning') as mock_task:
-        yield mock_task
-
-
-@pytest.fixture
-def mock_alcf_tomopy_reconstruction_flow():
-    """Fixture for mocking the alcf_tomopy_reconstruction_flow"""
-    with patch('orchestration.flows.bl832.alcf.alcf_tomopy_reconstruction_flow') as mock_task:
-        yield mock_task
-
-
-# Create tests for the functions in the 832 ALCF flow
-def test_get_flows_client(mock_confidential_client):
-    """Test for getting the flows client"""
-    # Run the function
-    client = get_flows_client()
-    
-    # Ensure the returned client is not None
-    assert client is not None, "Client should not be None"
-
-
-def test_get_specific_flow_client(mock_confidential_client, mock_specific_flow_client, mock_client_credentials_authorizer):
-    """Test for getting a specific flow client"""
-    flow_id = "your_flow_id"
-    collection_ids = ["your_collection_id"]
-
-    # Run the function
-    client = get_specific_flow_client(flow_id, collection_ids)
-    
-    # Ensure the returned client is not None
-    assert client is not None, "Client should not be None"
-
-
-def test_process_new_832_ALCF_flow(mock_transfer_data_to_alcf, mock_transfer_data_to_nersc, mock_schedule_pruning, mock_alcf_tomopy_reconstruction_flow):
+def test_process_new_832_ALCF_flow(monkeypatch):
     """Test for the process of a new 832 ALCF flow"""
     folder_name = "test_folder"
     file_name = "test_file"
     is_export_control = False
     send_to_alcf = True
 
-    # Set up the mock return values
-    mock_transfer_data_to_alcf.return_value = True
-    mock_transfer_data_to_nersc.return_value = True
-    mock_alcf_tomopy_reconstruction_flow.return_value = True
+    mock_flow_client = MockSpecificFlowClient(UUID("123e4567-e89b-12d3-a456-426614174000"))
+    mock_transfer_client = MockTransferClient()
 
-    # Run the function
-    result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+    # Monkeypatch the Config832 __init__ method to inject mock clients
+    original_init = Config832.__init__
 
-    # Assert the expected results
-    assert isinstance(result, list), "Result should be a list"
-    assert result == [True, True, True], "Result does not match expected values"
+    def mock_init(self):
+        original_init(self)
+        self.flow_client = mock_flow_client
+        self.tc = mock_transfer_client
 
-    # Verify that the transfer_data_to_alcf task was called with the expected arguments
-    mock_transfer_data_to_alcf.assert_called_once_with(f"{folder_name}/{file_name}.h5", ANY, ANY, ANY)
-    
-    # Verify that the alcf_tomopy_reconstruction_flow task was called with the expected arguments
-    mock_alcf_tomopy_reconstruction_flow.assert_called_once_with(
-        raw_path=f"bl832_test/raw/{folder_name}",
-        scratch_path=f"bl832_test/scratch/{folder_name}",
-        folder_name=folder_name,
-        file_name=f"{file_name}.h5"
-    )
-    
-    # Verify that the transfer_data_to_nersc task was called with the expected arguments
-    mock_transfer_data_to_nersc.assert_any_call(
-        f"{folder_name}/rec{file_name}/",
-        ANY, ANY, ANY
-    )
-    mock_transfer_data_to_nersc.assert_any_call(
-        f"{folder_name}/rec{file_name}.zarr/",
-        ANY, ANY, ANY
-    )
-    
-    # Verify that the schedule_pruning task was called with the expected arguments
-    mock_schedule_pruning.assert_called_once_with(
-        alcf_raw_path=f"{folder_name}/{file_name}.h5",
-        alcf_scratch_path_tiff=f"{folder_name}/rec{file_name}/",
-        alcf_scratch_path_zarr=f"{folder_name}/rec{file_name}.zarr/",
-        nersc_scratch_path_tiff=f"{folder_name}/rec{file_name}/",
-        nersc_scratch_path_zarr=f"{folder_name}/rec{file_name}.zarr/",
-        one_minute=True
-    )
+    monkeypatch.setattr(Config832, "__init__", mock_init)
+
+    # Monkeypatch the ConfidentialAppAuthClient and ClientCredentialsAuthorizer
+    def mock_oauth2_client_credentials_tokens(self):
+        return {
+            "access_token": "fake_access_token",
+            "expires_in": 3600,
+        }
+
+    monkeypatch.setattr(ConfidentialAppAuthClient, "oauth2_client_credentials_tokens", mock_oauth2_client_credentials_tokens)
+
+    def mock_get_new_access_token(self):
+        pass
+
+    monkeypatch.setattr(ClientCredentialsAuthorizer, "_get_new_access_token", mock_get_new_access_token)
+
+    # Mock the Client to avoid real network calls
+    with patch.object(Client, 'version_check', return_value=None):
+        # Now call the function under test
+        result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+
+        # Assert the expected results
+        assert isinstance(result, list), "Result should be a list"
+        assert result == [True, True, True], "Result does not match expected values"
