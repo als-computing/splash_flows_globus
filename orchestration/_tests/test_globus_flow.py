@@ -34,6 +34,12 @@ def prefect_test_fixture():
         yield
 
 
+@pytest.fixture(autouse=True)
+def set_env_vars(monkeypatch):
+    monkeypatch.setenv("GLOBUS_COMPUTE_ENDPOINT", "mock_compute_endpoint_id")
+    monkeypatch.setenv("GLOBUS_RECONSTRUCTION_FUNC", "mock_reconstruction_func_id")
+    monkeypatch.setenv("GLOBUS_IRIBETA_CGS_ENDPOINT", "mock_iribeta_cgs_endpoint_id")
+
 # Define models using Pydantic for better validation and type checking
 class FlowDefinition(BaseModel):
     """Model for flow definition"""
