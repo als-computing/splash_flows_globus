@@ -10,4 +10,4 @@ pyyaml
 authlib
 sfapi_client
 globus-compute-sdk @ git+https://github.com/globus/globus-compute.git@d1731340074be56861ec91d732bdff44f8e2b46e#subdirectory=compute_sdk
-griffe
+griffe==0.47
