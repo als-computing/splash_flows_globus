@@ -10,7 +10,7 @@ from prefect.blocks.system import JSON, Secret
 from pydantic import BaseModel, ConfigDict, PydanticDeprecatedSince20
 import pytest
 from typing import List, Optional, Dict, Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 from uuid import UUID, uuid4
 import warnings
 
@@ -20,6 +20,17 @@ warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
 
 @pytest.fixture(autouse=True, scope="session")
 def prefect_test_fixture():
+    """
+    A pytest fixture that automatically sets up and tears down the Prefect test harness 
+    for the entire test session. It creates and saves test secrets and configurations 
+    required for Globus integration.
+
+    This fixture ensures that the Prefect environment is properly isolated and mocked 
+    during testing.
+
+    Yields:
+        None
+    """
     with prefect_test_harness():
         globus_client_id = Secret(value="test-globus-client-id")
         globus_client_id.save(name="globus-client-id")
@@ -32,12 +43,79 @@ def prefect_test_fixture():
 
 @pytest.fixture(autouse=True)
 def set_env_vars(monkeypatch):
+    """
+    A pytest fixture that automatically sets environment variables required for 
+    Globus Compute SDK and Globus Flows during each test.
+
+    The fixture uses monkeypatching to mock environment variables, ensuring 
+    that the tests don't rely on real environment configurations.
+
+    Args:
+        monkeypatch: A pytest fixture that allows modifying environment variables 
+                     for the duration of the test.
+
+    Yields:
+        None
+    """
     monkeypatch.setenv("GLOBUS_COMPUTE_ENDPOINT", uuid4())
     monkeypatch.setenv("GLOBUS_RECONSTRUCTION_FUNC", uuid4())
     monkeypatch.setenv("GLOBUS_IRIBETA_CGS_ENDPOINT", uuid4())
 
 
-# Define models using Pydantic for better validation and type checking
+@pytest.fixture(autouse=True)
+def mock_globus_compute_client(monkeypatch):
+    """
+    A pytest fixture that automatically mocks the Globus Compute SDK's Client 
+    class to avoid real network calls during testing.
+
+    This fixture replaces the Client class methods with mock implementations 
+    that return predefined values, ensuring that tests are isolated from 
+    external dependencies.
+
+    Args:
+        monkeypatch: A pytest fixture that allows monkeypatching class methods 
+                     for the duration of the test.
+
+    Yields:
+        None
+    """
+    monkeypatch.setattr(Client, "__init__", MockGlobusComputeClient.__init__)
+    monkeypatch.setattr(Client, "version_check", MockGlobusComputeClient.version_check)
+    monkeypatch.setattr(Client, "run", MockGlobusComputeClient.run)
+    monkeypatch.setattr(Client, "get_task", MockGlobusComputeClient.get_task)
+    monkeypatch.setattr(Client, "get_result", MockGlobusComputeClient.get_result)
+
+
+@pytest.fixture
+def mock_confidential_client():
+    """Fixture for mocking the confidential client"""
+    with patch('orchestration.globus.flows.ConfidentialAppAuthClient') as MockClient:
+        instance = MockClient.return_value
+        instance.oauth2_client_credentials_tokens.return_value = {
+            "access_token": "fake_access_token",
+            "expires_in": 3600
+        }
+        yield instance
+
+
+@pytest.fixture
+def mock_specific_flow_client():
+    """Fixture for mocking the specific flow client"""
+    with patch('orchestration.globus.flows.SpecificFlowClient') as MockClient:
+        instance = MockClient.return_value
+        instance.scopes = MagicMock()
+        instance.scopes.make_mutable.return_value = "fake_scope"
+        yield instance
+
+
+@pytest.fixture
+def mock_client_credentials_authorizer():
+    """Fixture for mocking the client credentials authorizer"""
+    with patch('orchestration.globus.flows.ClientCredentialsAuthorizer') as MockAuthorizer:
+        instance = MockAuthorizer.return_value
+        yield instance
+
+
 class FlowDefinition(BaseModel):
     """Model for flow definition"""
     StartAt: str
@@ -156,15 +234,6 @@ class MockGlobusComputeClient(Client):
         return "mock_result"
 
 
-@pytest.fixture(autouse=True)
-def mock_globus_compute_client(monkeypatch):
-    monkeypatch.setattr(Client, "__init__", MockGlobusComputeClient.__init__)
-    monkeypatch.setattr(Client, "version_check", MockGlobusComputeClient.version_check)
-    monkeypatch.setattr(Client, "run", MockGlobusComputeClient.run)
-    monkeypatch.setattr(Client, "get_task", MockGlobusComputeClient.get_task)
-    monkeypatch.setattr(Client, "get_result", MockGlobusComputeClient.get_result)
-
-
 # Define mock classes for FlowsClient and SpecificFlowClient
 class MockFlowsClient:
     """Mock class for FlowsClient"""
@@ -199,48 +268,15 @@ class MockSpecificFlowClient:
         return self.runs.get(run_id, {})
 
 
-# Create fixtures for mocking the confidential client, specific flow client, and client credentials authorizer
-@pytest.fixture
-def mock_confidential_client():
-    """Fixture for mocking the confidential client"""
-    with patch('orchestration.globus.flows.ConfidentialAppAuthClient') as MockClient:
-        instance = MockClient.return_value
-        instance.oauth2_client_credentials_tokens.return_value = {
-            "access_token": "fake_access_token",
-            "expires_in": 3600
-        }
-        yield instance
-
-
-@pytest.fixture
-def mock_specific_flow_client():
-    """Fixture for mocking the specific flow client"""
-    with patch('orchestration.globus.flows.SpecificFlowClient') as MockClient:
-        instance = MockClient.return_value
-        instance.scopes = MagicMock()
-        instance.scopes.make_mutable.return_value = "fake_scope"
-        yield instance
-
-
-@pytest.fixture
-def mock_client_credentials_authorizer():
-    """Fixture for mocking the client credentials authorizer"""
-    with patch('orchestration.globus.flows.ClientCredentialsAuthorizer') as MockAuthorizer:
-        instance = MockAuthorizer.return_value
-        yield instance
-
-
 def test_process_new_832_ALCF_flow(monkeypatch):
     """Test for the process of a new 832 ALCF flow"""
     folder_name = "test_folder"
     file_name = "test_file"
-    is_export_control = False
-    send_to_alcf = True
 
     # Use the MockConfig832 class
     mock_config = MockConfig832()
 
-    # Monkeypatch the __init__ method to use the mock instance
+    # Monkeypatch the __init__ method of Config832 to use the mock instance
     def mock_init(self):
         self.flow_client = mock_config.flow_client
         self.tc = mock_config.tc
@@ -270,8 +306,99 @@ def test_process_new_832_ALCF_flow(monkeypatch):
 
     monkeypatch.setattr(ClientCredentialsAuthorizer, "_get_new_access_token", mock_get_new_access_token)
 
-    result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+    # Mock the functions that will be called by process_new_832_ALCF_flow() in alcf.py
+    mock_transfer_to_alcf = MagicMock(return_value=True)
+    mock_reconstruction_flow = MagicMock(return_value=True)
+    mock_transfer_to_nersc = MagicMock(return_value=True)
+    mock_schedule_pruning = MagicMock(return_value=True)
+
+    monkeypatch.setattr('orchestration.flows.bl832.alcf.transfer_data_to_alcf', mock_transfer_to_alcf)
+    monkeypatch.setattr('orchestration.flows.bl832.alcf.alcf_tomopy_reconstruction_flow', mock_reconstruction_flow)
+    monkeypatch.setattr('orchestration.flows.bl832.alcf.transfer_data_to_nersc', mock_transfer_to_nersc)
+    monkeypatch.setattr('orchestration.flows.bl832.alcf.schedule_pruning', mock_schedule_pruning)
+
+    alcf_raw_path = f"{folder_name}/{file_name}.h5" if True else None
+    scratch_path_tiff = f"{folder_name}/rec{file_name}/" if True else None
+    scratch_path_zarr = f"{folder_name}/rec{file_name}.zarr/" if True else None
 
     # Assert the expected results
+    # Case 1: Send to ALCF is True and is_export_control is False
+    # Expect all functions to be called
+    send_to_alcf = True
+    is_export_control = False
+    result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+
+    mock_transfer_to_alcf.assert_called_once_with(f"{folder_name}/{file_name}.h5",
+                                                  mock_config.tc,
+                                                  mock_config.nersc_test,
+                                                  mock_config.alcf832_raw)
+
+    mock_reconstruction_flow.assert_called_once_with(raw_path=f"bl832_test/raw/{folder_name}",
+                                                     scratch_path=f"bl832_test/scratch/{folder_name}",
+                                                     folder_name=folder_name, file_name=f"{file_name}.h5")
+
+    mock_transfer_to_nersc.assert_has_calls([
+        call(scratch_path_tiff, mock_config.tc, mock_config.alcf832_scratch, mock_config.nersc832_alsdev_scratch),
+        call(scratch_path_zarr, mock_config.tc, mock_config.alcf832_scratch, mock_config.nersc832_alsdev_scratch)
+    ])
+
+    mock_schedule_pruning.assert_called_once_with(
+        alcf_raw_path=alcf_raw_path,
+        alcf_scratch_path_tiff=scratch_path_tiff,
+        alcf_scratch_path_zarr=scratch_path_zarr,
+        nersc_scratch_path_tiff=scratch_path_tiff,
+        nersc_scratch_path_zarr=scratch_path_zarr,
+        one_minute=True
+    )
     assert isinstance(result, list), "Result should be a list"
     assert result == [True, True, True], "Result does not match expected values"
+    mock_transfer_to_alcf.reset_mock()
+    mock_reconstruction_flow.reset_mock()
+    mock_transfer_to_nersc.reset_mock()
+    mock_schedule_pruning.reset_mock()
+
+    # Case 2: Send to ALCF is False and is_export_control is False
+    # Expect no functions to be called
+    send_to_alcf = False
+    is_export_control = False
+    result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+    mock_transfer_to_alcf.assert_not_called()
+    mock_reconstruction_flow.assert_not_called()
+    mock_transfer_to_nersc.assert_not_called()
+    mock_schedule_pruning.assert_not_called()
+    assert isinstance(result, list), "Result should be a list"
+    assert result == [False, False, False], "Result does not match expected values"
+
+    mock_transfer_to_alcf.reset_mock()
+    mock_reconstruction_flow.reset_mock()
+    mock_transfer_to_nersc.reset_mock()
+    mock_schedule_pruning.reset_mock()
+
+    # Case 3: Send to ALCF is False and is_export_control is True
+    # Expect no functions to be called
+    send_to_alcf = False
+    is_export_control = True
+    result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+    mock_transfer_to_alcf.assert_not_called()
+    mock_reconstruction_flow.assert_not_called()
+    mock_transfer_to_nersc.assert_not_called()
+    mock_schedule_pruning.assert_not_called()
+    assert isinstance(result, list), "Result should be a list"
+    assert result == [False, False, False], "Result does not match expected values"
+
+    mock_transfer_to_alcf.reset_mock()
+    mock_reconstruction_flow.reset_mock()
+    mock_transfer_to_nersc.reset_mock()
+    mock_schedule_pruning.reset_mock()
+
+    # Case 4: Send to ALCF is True and is_export_control is True
+    # Expect no functions to be called
+    send_to_alcf = True
+    is_export_control = True
+    result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+    mock_transfer_to_alcf.assert_not_called()
+    mock_reconstruction_flow.assert_not_called()
+    mock_transfer_to_nersc.assert_not_called()
+    mock_schedule_pruning.assert_not_called()
+    assert isinstance(result, list), "Result should be a list"
+    assert result == [False, False, False], "Result does not match expected values"
