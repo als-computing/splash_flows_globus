@@ -14,10 +14,12 @@ from prefect.blocks.system import JSON, Secret
 
 from orchestration._tests.test_globus import MockTransferClient
 
-from globus_sdk import ConfidentialAppAuthClient
+from globus_sdk import ConfidentialAppAuthClient, TransferClient
 from globus_sdk.authorizers.client_credentials import ClientCredentialsAuthorizer
 from globus_compute_sdk.sdk.client import Client
 
+import os
+import responses
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
@@ -39,6 +41,16 @@ def set_env_vars(monkeypatch):
     monkeypatch.setenv("GLOBUS_COMPUTE_ENDPOINT", uuid4())
     monkeypatch.setenv("GLOBUS_RECONSTRUCTION_FUNC", uuid4())
     monkeypatch.setenv("GLOBUS_IRIBETA_CGS_ENDPOINT", uuid4())
+
+
+@pytest.fixture(autouse=True)
+def mocked_responses(monkeypatch):
+    responses.start()
+    monkeypatch.setitem(os.environ, "GLOBUS_SDK_ENVIRONMENT", "production")
+    yield
+    responses.stop()
+    responses.reset()
+
 
 # Define models using Pydantic for better validation and type checking
 class FlowDefinition(BaseModel):
@@ -80,6 +92,91 @@ class RunFlowRequest(BaseModel):
     additional_fields: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class MockEndpoint:
+    def __init__(self, root_path, uuid_value=None):
+        self.root_path = root_path
+        self.uuid = uuid_value or str(uuid4())
+        self.uri = f"mock_endpoint_uri_{self.uuid}"
+
+
+class MockConfig832(Config832):
+    def __init__(self) -> None:
+        # Mock configuration
+        config = {
+            "scicat": "mock_scicat_value"
+        }
+
+        # Mock endpoints with UUIDs
+        self.endpoints = {
+            "spot832": MockEndpoint(root_path="mock_spot832_path", uuid_value=str(uuid4())),
+            "data832": MockEndpoint(root_path="mock_data832_path", uuid_value=str(uuid4())),
+            "nersc832": MockEndpoint(root_path="mock_nersc832_path", uuid_value=str(uuid4())),
+            "nersc_test": MockEndpoint(root_path="mock_nersc_test_path", uuid_value=str(uuid4())),
+            "nersc_alsdev": MockEndpoint(root_path="mock_nersc_alsdev_path", uuid_value=str(uuid4())),
+            "nersc832_alsdev_raw": MockEndpoint(root_path="mock_nersc832_alsdev_raw_path", uuid_value=str(uuid4())),
+            "nersc832_alsdev_scratch": MockEndpoint(root_path="mock_nersc832_alsdev_scratch_path", uuid_value=str(uuid4())),
+            "alcf832_raw": MockEndpoint(root_path="mock_alcf832_raw_path", uuid_value=str(uuid4())),
+            "alcf832_scratch": MockEndpoint(root_path="mock_alcf832_scratch_path", uuid_value=str(uuid4())),
+        }
+
+        # Mock apps
+        self.apps = {
+            "als_transfer": "mock_als_transfer_app"
+        }
+
+        # Use the MockTransferClient instead of the real TransferClient
+        self.tc = MagicMock(spec=TransferClient)
+        self.tc.get_submission_id.return_value = {"value": "mock_submission_id"}
+        self.tc.submit_transfer.return_value = {"task_id": "mock_task_id"}
+
+        # Use the MockSpecificFlowClient instead of the real FlowsClient
+        self.flow_client = MockSpecificFlowClient(UUID("123e4567-e89b-12d3-a456-426614174000"))
+
+        # Set attributes directly on the object
+        self.nersc_test = self.endpoints["nersc_test"]
+        self.alcf832_raw = self.endpoints["alcf832_raw"]
+        self.alcf832_scratch = self.endpoints["alcf832_scratch"]
+        self.nersc832_alsdev_scratch = self.endpoints["nersc832_alsdev_scratch"]
+        self.scicat = config["scicat"]
+
+
+# Mock the Client class to avoid real network calls
+class MockGlobusComputeClient(Client):
+    def __init__(self, *args, **kwargs):
+        # Skip initializing the real client
+        pass
+
+    def version_check(self):
+        # Mock version check to do nothing
+        pass
+
+    def run(self, *args, **kwargs):
+        # Mock run to return a fake task ID
+        return "mock_task_id"
+
+    def get_task(self, task_id):
+        # Mock getting task to return a successful result
+        return {
+            "pending": False,
+            "status": "success",
+            "result": "mock_result"
+        }
+
+    def get_result(self, task_id):
+        # Mock getting the result of a task
+        return "mock_result"
+
+# Update your test to include this mocking
+@pytest.fixture(autouse=True)
+def mock_globus_compute_client(monkeypatch):
+    monkeypatch.setattr(Client, "__init__", MockGlobusComputeClient.__init__)
+    monkeypatch.setattr(Client, "version_check", MockGlobusComputeClient.version_check)
+    monkeypatch.setattr(Client, "run", MockGlobusComputeClient.run)
+    monkeypatch.setattr(Client, "get_task", MockGlobusComputeClient.get_task)
+    monkeypatch.setattr(Client, "get_result", MockGlobusComputeClient.get_result)
+
 
 # Define mock classes for FlowsClient and SpecificFlowClient
 class MockFlowsClient:
@@ -157,16 +254,20 @@ def test_process_new_832_ALCF_flow(monkeypatch):
     is_export_control = False
     send_to_alcf = True
 
-    mock_flow_client = MockSpecificFlowClient(UUID("123e4567-e89b-12d3-a456-426614174000"))
-    mock_transfer_client = MockTransferClient()
+    # Use the MockConfig832 class
+    mock_config = MockConfig832()
 
-    # Monkeypatch the Config832 __init__ method to inject mock clients
-    original_init = Config832.__init__
-
+    # Monkeypatch the __init__ method to use the mock instance
     def mock_init(self):
-        original_init(self)
-        self.flow_client = mock_flow_client
-        self.tc = mock_transfer_client
+        self.flow_client = mock_config.flow_client
+        self.tc = mock_config.tc
+        self.endpoints = mock_config.endpoints
+        self.apps = mock_config.apps
+        self.scicat = mock_config.scicat
+        self.nersc_test = mock_config.nersc_test
+        self.alcf832_raw = mock_config.alcf832_raw
+        self.alcf832_scratch = mock_config.alcf832_scratch
+        self.nersc832_alsdev_scratch = mock_config.nersc832_alsdev_scratch
 
     monkeypatch.setattr(Config832, "__init__", mock_init)
 
@@ -184,11 +285,8 @@ def test_process_new_832_ALCF_flow(monkeypatch):
 
     monkeypatch.setattr(ClientCredentialsAuthorizer, "_get_new_access_token", mock_get_new_access_token)
 
-    # Mock the Client to avoid real network calls and login flow
-    with patch.object(Client, 'version_check', return_value=None):
-        with patch.object(Client, '__init__', return_value=None):
-            result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
+    result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf)
 
-            # Assert the expected results
-            assert isinstance(result, list), "Result should be a list"
-            assert result == [True, True, True], "Result does not match expected values"
+    # Assert the expected results
+    assert isinstance(result, list), "Result should be a list"
+    assert result == [True, True, True], "Result does not match expected values"
