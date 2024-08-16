@@ -18,9 +18,6 @@ from globus_sdk import ConfidentialAppAuthClient, TransferClient
 from globus_sdk.authorizers.client_credentials import ClientCredentialsAuthorizer
 from globus_compute_sdk.sdk.client import Client
 
-import os
-import responses
-
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
 
@@ -41,15 +38,6 @@ def set_env_vars(monkeypatch):
     monkeypatch.setenv("GLOBUS_COMPUTE_ENDPOINT", uuid4())
     monkeypatch.setenv("GLOBUS_RECONSTRUCTION_FUNC", uuid4())
     monkeypatch.setenv("GLOBUS_IRIBETA_CGS_ENDPOINT", uuid4())
-
-
-@pytest.fixture(autouse=True)
-def mocked_responses(monkeypatch):
-    responses.start()
-    monkeypatch.setitem(os.environ, "GLOBUS_SDK_ENVIRONMENT", "production")
-    yield
-    responses.stop()
-    responses.reset()
 
 
 # Define models using Pydantic for better validation and type checking
