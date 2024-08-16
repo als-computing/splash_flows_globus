@@ -15,8 +15,8 @@ from globus_sdk import (
     TransferData,
     GlobusAPIError
 )
-from prefect import flow, task, get_run_logger
-from prefect.blocks.system import JSON, Secret
+from prefect import task, get_run_logger
+from prefect.blocks.system import Secret
 from ..config import get_config
 
 load_dotenv()
@@ -73,6 +73,7 @@ def build_apps(config: Dict) -> Dict[str, GlobusEndpoint]:
     for app_name, app_config in config["globus"]["globus_apps"].items():
         apps[app_name] = GlobusApp(app_config["client_id"], app_config["client_secret"])
     return apps
+
 
 @task
 def init_transfer_client(app: GlobusApp) -> TransferClient:
@@ -192,7 +193,7 @@ def prune_files(
     print("endpoint", endpoint)
     print("endpoint.uuid", endpoint.uuid)
     print("files", files)
-    
+
     try:
         ddata = DeleteData(transfer_client=transfer_client, endpoint=endpoint.uuid, recursive=True)
         logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
@@ -235,14 +236,14 @@ def monitor_task(transfer_client, task_id):
         status = task["status"]
         print(f"Task {task_id} status: {status}")
         print(task)
-        
+
         if status == "FAILED":
             error_message = task
             print(f"Task {task_id} failed with error: {error_message}")
             break
         elif status in ["SUCCEEDED", "CANCELED"]:
             break
-        
+
         sleep(5)  # Wait for 5 seconds before checking again
 
 
@@ -338,7 +339,7 @@ def prune_one_safe(
 
 if __name__ == "__main__":
     from orchestration.flows.bl832.config import Config832
-    import pickle
+    # import pickle
     config = Config832()
 
     # endpoints = build_endpoints(config)
@@ -366,7 +367,7 @@ if __name__ == "__main__":
     #         with open("transfer_client.pkl", "wb") as f:
     #             pickle.dump(tc, f)
 
-
-    
-    # delete_id = prune_files(tc, config.alcf832_scratch, ["/bl832_test/scratch/BLS-00564_dyparkinson/rec20230224_132553_sea_shell.zarr/"])
+    # delete_id = prune_files(tc,
+    #                         config.alcf832_scratch,
+    #                         ["/bl832_test/scratch/BLS-00564_dyparkinson/rec20230224_132553_sea_shell.zarr/"])
     # monitor_task(tc, delete_id)

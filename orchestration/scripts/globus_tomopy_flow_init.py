@@ -1,6 +1,6 @@
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv
 from globus_compute_sdk import Client, Executor
-from orchestration.globus.flows import get_flows_client, get_specific_flow_client
+from orchestration.globus.flows import get_flows_client
 
 
 """
@@ -8,8 +8,8 @@ init.py only needs to be run once to authenticate the polaris (alcf) endpoint ID
 Additionally, it sets up the functions that will be used to transfer data.
 """
 
+
 def reconstruction_wrapper(rundir, parametersfile="inputOneSliceOfEach.txt"):
-    
     """
     Python function that wraps around the application call for Tomopy reconstruction on ALCF
 
@@ -34,10 +34,11 @@ def reconstruction_wrapper(rundir, parametersfile="inputOneSliceOfEach.txt"):
         res = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         end = time.time()
-        return f"Reconstructed data specified in {parametersfile} in {end-start:.2f} seconds;\n {res.stdout.decode()}"
+        return f"Reconstructed data in {parametersfile} in {end-start:.2f} seconds;\n {res.stdout.decode()}"
 
     except Exception as e:
         return f"Error during reconstruction: {str(e)}"
+
 
 def create_flow_definition():
     flow_definition = {
@@ -90,7 +91,8 @@ if __name__ == "__main__":
     # print(future.result())
     reconstruction_func = gc.register_function(reconstruction_wrapper)
     print(reconstruction_func)
-    future = gce.submit_to_registered_function(args=["/eagle/IRIBeta/als/example"], function_id=reconstruction_func)
+    future = gce.submit_to_registered_function(args=["/eagle/IRIBeta/als/example"],
+                                               function_id=reconstruction_func)
     future.result()
     flow_definition = create_flow_definition()
     fc = get_flows_client()

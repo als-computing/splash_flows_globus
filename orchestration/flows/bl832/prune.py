@@ -1,4 +1,3 @@
-from globus_sdk import ConfidentialAppAuthClient, ClientCredentialsAuthorizer, TransferClient
 import logging
 from orchestration.flows.bl832.config import Config832
 from orchestration.globus.transfer import (
@@ -8,8 +7,8 @@ from orchestration.globus.transfer import (
     # prune_files,
     prune_one_safe,
 )
-from prefect import flow, task, get_run_logger
-from prefect.blocks.system import JSON, Secret
+from prefect import flow, get_run_logger
+from prefect.blocks.system import JSON
 
 
 logger = logging.getLogger(__name__)
@@ -120,7 +119,7 @@ def prune_nersc832_alsdev_scratch(relative_path: str):
         if_older_than_days=0,
         tranfer_client=config.tc,
         source_endpoint=config.nersc832_alsdev_scratch,
-        check_endpoint=None, #config.data832,
+        check_endpoint=None,  # config.data832,
         logger=p_logger,
         max_wait_seconds=max_wait_seconds,
     )

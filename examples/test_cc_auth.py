@@ -10,11 +10,8 @@ load_dotenv()
 # Set the client ID and fetch client secret from environment
 CLIENT_ID = os.getenv('GLOBUS_CLIENT_ID')
 CLIENT_SECRET = os.getenv('GLOBUS_CLIENT_SECRET')
-
-# SCOPES = ['urn:globus:auth:scope:transfer.api.globus.org:all[*https://auth.globus.org/scopes/55c3adf6-31f1-4647-9a38-52591642f7e7/data_access]']
 SCOPES = "urn:globus:auth:scope:transfer.api.globus.org:all"
-# ENDPOINT_ID = "d40248e6-d874-4f7b-badd-2c06c16f1a58" # NERSC DTN alsdev Collab
-ENDPOINT_ID = "55c3adf6-31f1-4647-9a38-52591642f7e7" #ALCF Iribeta CGS
+ENDPOINT_ID = "UUID"
 
 
 def initialize_transfer_client():
@@ -62,6 +59,7 @@ def list_directory(transfer_client, endpoint_id, path):
         elapsed_time = time.time() - start_time
         logger.info(f"list_directory task took {elapsed_time:.2f} seconds")
 
+
 @task
 def create_directory(transfer_client, endpoint_id, base_path, directory_name):
     logger = get_run_logger()
@@ -72,7 +70,7 @@ def create_directory(transfer_client, endpoint_id, base_path, directory_name):
             base_path += '/'
         if base_path.startswith('/'):
             base_path = base_path.lstrip('/')
-        
+
         full_path = base_path + directory_name
 
         # Validate the path
@@ -89,7 +87,7 @@ def create_directory(transfer_client, endpoint_id, base_path, directory_name):
         if err.info.consent_required:
             logger.error(f"Got a ConsentRequired error with scopes: {err.info.consent_required.required_scopes}")
         elif err.code == "PermissionDenied":
-            logger.error(f"Permission denied for creating directory {full_path}. Ensure proper permissions are set.")
+            logger.error(f"Permission denied for creating directory {full_path}. Ensure proper permissions.")
         elif err.http_status == 500:
             logger.error(f"Server error when creating directory {full_path} in endpoint {endpoint_id}.")
         else:
@@ -107,7 +105,8 @@ def remove_directory(transfer_client, endpoint_id, path):
         delete_data = globus_sdk.DeleteData(transfer_client, endpoint_id, recursive=True)
         delete_data.add_item(path)
         transfer_result = transfer_client.submit_delete(delete_data)
-        logger.info(f"Successfully submitted request to remove directory {path} in endpoint {endpoint_id}. Task ID: {transfer_result['task_id']}")
+        logger.info(f"Successfully submitted request to remove directory {path} in endpoint {endpoint_id}.")
+        logger.info(f"Task ID: {transfer_result['task_id']}")
     except globus_sdk.GlobusAPIError as err:
         logger.error(f"Error removing directory {path} in endpoint {endpoint_id}: {err.message}")
         if err.info.consent_required:
@@ -134,18 +133,19 @@ def main_flow():
 
     # List the contents of the root directory
     logger = get_run_logger()
-    # logger.info("Listing / directory:")
-    # list_directory(transfer_client, endpoint_id, base_path)
+    logger.info("Listing / directory:")
+    list_directory(transfer_client, endpoint_id, base_path)
 
     # Create a new directory in the root directory
-    # new_directory_name = "test/"
-    # create_directory(transfer_client, endpoint_id, base_path, new_directory_name)
+    new_directory_name = "test/"
+    create_directory(transfer_client, endpoint_id, base_path, new_directory_name)
 
     remove_directory(transfer_client, endpoint_id, "bl832_test/scratch/BLS-00564_dyparkinson/")
 
     # List the contents again to verify the new directory
-    # logger.info(f"\nListing / directory after creating {new_directory_name}:")
-    # list_directory(transfer_client, endpoint_id, base_path+new_directory_name)
+    logger.info(f"\nListing / directory after creating {new_directory_name}:")
+    list_directory(transfer_client, endpoint_id, base_path+new_directory_name)
+
 
 if __name__ == "__main__":
     main_flow()

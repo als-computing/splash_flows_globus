@@ -34,7 +34,7 @@ try:
     token_response = auth_client.oauth2_client_credentials_tokens(requested_scopes=SCOPES)
     compute_tokens = token_response.by_resource_server['compute.api.globus.org']
     access_token = compute_tokens['access_token']
-    
+
     # Initialize the ComputeClient with the token
     compute_client = ComputeClient(authorizer=globus_sdk.AccessTokenAuthorizer(access_token))
 

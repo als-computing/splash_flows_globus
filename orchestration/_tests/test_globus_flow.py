@@ -1,33 +1,30 @@
-from pydantic import BaseModel, ConfigDict, PydanticDeprecatedSince20
-import warnings
-import pytest
-from unittest.mock import MagicMock, patch
-from typing import List, Optional, Dict, Any
-from uuid import UUID, uuid4
+from globus_sdk import ConfidentialAppAuthClient, TransferClient
+from globus_sdk.authorizers.client_credentials import ClientCredentialsAuthorizer
+from globus_compute_sdk.sdk.client import Client
 from orchestration.flows.bl832.alcf import (
     process_new_832_ALCF_flow
 )
 from orchestration.flows.bl832.config import Config832
-
 from prefect.testing.utilities import prefect_test_harness
 from prefect.blocks.system import JSON, Secret
-
-from orchestration._tests.test_globus import MockTransferClient
-
-from globus_sdk import ConfidentialAppAuthClient, TransferClient
-from globus_sdk.authorizers.client_credentials import ClientCredentialsAuthorizer
-from globus_compute_sdk.sdk.client import Client
+from pydantic import BaseModel, ConfigDict, PydanticDeprecatedSince20
+import pytest
+from typing import List, Optional, Dict, Any
+from unittest.mock import MagicMock, patch
+from uuid import UUID, uuid4
+import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
 
+
 @pytest.fixture(autouse=True, scope="session")
 def prefect_test_fixture():
     with prefect_test_harness():
-        globus_client_id = Secret(value =  "test-globus-client-id")
-        globus_client_id.save(name = "globus-client-id")
-        globus_client_secret = Secret(value = "your_globus_client_secret")
-        globus_client_secret.save(name = "globus-client-secret")
+        globus_client_id = Secret(value="test-globus-client-id")
+        globus_client_id.save(name="globus-client-id")
+        globus_client_secret = Secret(value="your_globus_client_secret")
+        globus_client_secret.save(name="globus-client-secret")
         pruning_config = JSON(value={"max_wait_seconds": 600})
         pruning_config.save(name="pruning-config")
         yield
@@ -103,8 +100,10 @@ class MockConfig832(Config832):
             "nersc832": MockEndpoint(root_path="mock_nersc832_path", uuid_value=str(uuid4())),
             "nersc_test": MockEndpoint(root_path="mock_nersc_test_path", uuid_value=str(uuid4())),
             "nersc_alsdev": MockEndpoint(root_path="mock_nersc_alsdev_path", uuid_value=str(uuid4())),
-            "nersc832_alsdev_raw": MockEndpoint(root_path="mock_nersc832_alsdev_raw_path", uuid_value=str(uuid4())),
-            "nersc832_alsdev_scratch": MockEndpoint(root_path="mock_nersc832_alsdev_scratch_path", uuid_value=str(uuid4())),
+            "nersc832_alsdev_raw": MockEndpoint(root_path="mock_nersc832_alsdev_raw_path",
+                                                uuid_value=str(uuid4())),
+            "nersc832_alsdev_scratch": MockEndpoint(root_path="mock_nersc832_alsdev_scratch_path",
+                                                    uuid_value=str(uuid4())),
             "alcf832_raw": MockEndpoint(root_path="mock_alcf832_raw_path", uuid_value=str(uuid4())),
             "alcf832_scratch": MockEndpoint(root_path="mock_alcf832_scratch_path", uuid_value=str(uuid4())),
         }
@@ -156,7 +155,7 @@ class MockGlobusComputeClient(Client):
         # Mock getting the result of a task
         return "mock_result"
 
-# Update your test to include this mocking
+
 @pytest.fixture(autouse=True)
 def mock_globus_compute_client(monkeypatch):
     monkeypatch.setattr(Client, "__init__", MockGlobusComputeClient.__init__)
@@ -172,13 +171,11 @@ class MockFlowsClient:
     def __init__(self):
         self.flows = {}
 
-
     def create_flow(self, request: CreateFlowRequest) -> Dict[str, Any]:
         """Mock method for initializing a new flow with Globus Flows"""
         flow_id = UUID("123e4567-e89b-12d3-a456-426614174000")
         self.flows[flow_id] = request.model_dump()
         return {"flow_id": str(flow_id)}
-
 
     def get_flow(self, flow_id: UUID) -> Dict[str, Any]:
         """Mock method for getting a flow"""
@@ -191,13 +188,11 @@ class MockSpecificFlowClient:
         self.flow_id = flow_id
         self.runs = {}
 
-
     def run_flow(self, request: RunFlowRequest) -> Dict[str, Any]:
         """Mock method for running a registered flow function"""
         run_id = UUID("123e4567-e89b-12d3-a456-426614174001")
         self.runs[run_id] = request.model_dump()
         return {"run_id": str(run_id), "status": "SUCCEEDED"}
-
 
     def get_run(self, run_id: UUID) -> Dict[str, Any]:
         """Mock method for getting a run"""
@@ -266,7 +261,9 @@ def test_process_new_832_ALCF_flow(monkeypatch):
             "expires_in": 3600,
         }
 
-    monkeypatch.setattr(ConfidentialAppAuthClient, "oauth2_client_credentials_tokens", mock_oauth2_client_credentials_tokens)
+    monkeypatch.setattr(ConfidentialAppAuthClient,
+                        "oauth2_client_credentials_tokens",
+                        mock_oauth2_client_credentials_tokens)
 
     def mock_get_new_access_token(self):
         pass

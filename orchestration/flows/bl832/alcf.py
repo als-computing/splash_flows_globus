@@ -26,13 +26,13 @@ def transfer_data_to_alcf(
         destination_endpoint: GlobusEndpoint) -> bool:
     """
     Transfer data to ALCF endpoints.
-    
+
     Args:
         file_path (str): Path to the file that needs to be transferred.
         transfer_client (TransferClient): TransferClient instance.
         source_endpoint (GlobusEndpoint): Source endpoint.
         destination_endpoint (GlobusEndpoint): Destination endpoint.
-    
+
     Returns:
         bool: Whether the transfer was successful.
     """
@@ -68,15 +68,15 @@ def transfer_data_to_alcf(
     finally:
         # Stop the timer and calculate the duration
         elapsed_time = time.time() - start_time
-        logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")    
+        logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
 
 
 @task(name="transfer_data_to_nersc")
 def transfer_data_to_nersc(
-    file_path: str,
-    transfer_client: TransferClient,
-    source_endpoint: GlobusEndpoint,
-    nersc832: GlobusEndpoint) -> bool:
+        file_path: str,
+        transfer_client: TransferClient,
+        source_endpoint: GlobusEndpoint,
+        nersc832: GlobusEndpoint) -> bool:
     """
     Transfer data to NERSC endpoints.
 
@@ -129,10 +129,10 @@ def transfer_data_to_nersc(
 
 @task(name="transfer_data_to_data832")
 def transfer_data_to_data832(
-    file_path: str,
-    transfer_client: TransferClient,
-    source_endpoint: GlobusEndpoint,
-    data832: GlobusEndpoint) -> bool:
+        file_path: str,
+        transfer_client: TransferClient,
+        source_endpoint: GlobusEndpoint,
+        data832: GlobusEndpoint) -> bool:
     """
     Transfer data to data832 endpoints.
 
@@ -185,7 +185,7 @@ def schedule_prune_task(path: str, location: str, schedule_days: datetime.timede
 
     Args:
         path (str): The file path to the folder containing the files.
-        location (str): The server location (e.g., 'alcf832_raw', 'alc832f_scratch') from where the files will be pruned.
+        location (str): The server location (e.g., 'alcf832_raw') where the files will be pruned.
         schedule_days (int): The number of days after which the file should be deleted.
     """
     try:
@@ -205,14 +205,13 @@ def schedule_prune_task(path: str, location: str, schedule_days: datetime.timede
 
 @task(name="schedule_pruning")
 def schedule_pruning(
-    alcf_raw_path: str = None,
-    alcf_scratch_path_tiff: str = None,
-    alcf_scratch_path_zarr: str = None,
-    nersc_scratch_path_tiff: str = None,
-    nersc_scratch_path_zarr: str = None,
-    data832_scratch_path: str = None,
-    one_minute: bool = False
-    ) -> bool:
+        alcf_raw_path: str = None,
+        alcf_scratch_path_tiff: str = None,
+        alcf_scratch_path_zarr: str = None,
+        nersc_scratch_path_tiff: str = None,
+        nersc_scratch_path_zarr: str = None,
+        data832_scratch_path: str = None,
+        one_minute: bool = False) -> bool:
     """
     This function schedules the deletion of files from specified locations on ALCF, NERSC, and data832.
 
@@ -223,10 +222,10 @@ def schedule_pruning(
         nersc_scratch_path_tiff (str, optional): The scratch path for TIFF files on NERSC.
         nersc_scratch_path_zarr (str, optional): The scratch path for Zarr files on NERSC.
         data832_scratch_path (str, optional): The scratch path on data832.
-        one_minute (bool, optional): Defaults to False. Whether to schedule the deletion after one minute. Useful for testing.
+        one_minute (bool, optional): Defaults to False. Whether to schedule the deletion after one minute.
     """
     logger = get_run_logger()
-    
+
     pruning_config = JSON.load("pruning-config").value
 
     if one_minute:
@@ -234,10 +233,10 @@ def schedule_pruning(
         nersc_delay = datetime.timedelta(minutes=1)
         data832_delay = datetime.timedelta(minutes=1)
     else:
-        alcf_delay  = datetime.timedelta(days=pruning_config["delete_alcf832_files_after_days"])
+        alcf_delay = datetime.timedelta(days=pruning_config["delete_alcf832_files_after_days"])
         nersc_delay = datetime.timedelta(days=pruning_config["delete_nersc832_files_after_days"])
         data832_delay = datetime.timedelta(days=pruning_config["delete_data832_files_after_days"])
-    
+
     # (path, location, days)
     delete_schedules = [
         (alcf_raw_path, "alcf832_raw", alcf_delay),
@@ -247,7 +246,7 @@ def schedule_pruning(
         (nersc_scratch_path_zarr, "nersc832_alsdev_scratch", nersc_delay),
         (data832_scratch_path, "data832_scratch", data832_delay)
     ]
-    
+
     for path, location, days in delete_schedules:
         if path:
             schedule_prune_task(path, location, days)
@@ -260,10 +259,10 @@ def schedule_pruning(
 
 @flow(name="alcf_tomopy_reconstruction_flow")
 def alcf_tomopy_reconstruction_flow(
-    raw_path: str,
-    scratch_path: str,
-    folder_name: str,
-    file_name: str) -> bool:
+        raw_path: str,
+        scratch_path: str,
+        folder_name: str,
+        file_name: str) -> bool:
     """
     Run the Tomopy reconstruction flow on the ALCF.
 
@@ -276,17 +275,19 @@ def alcf_tomopy_reconstruction_flow(
         bool: The success status of the flow ('True', 'False').
     """
     logger = get_run_logger()
-    
+
     # Initialize the Globus Compute Client
     gcc = Client()
-    polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT") # COMPUTE endpoint, not TRANSFER endpoint
+    polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT")  # COMPUTE endpoint, not TRANSFER endpoint
     gce = Executor(endpoint_id=polaris_endpoint_id, client=gcc)
 
     reconstruction_func = os.getenv("GLOBUS_RECONSTRUCTION_FUNC")
     source_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
     destination_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
 
-    function_inputs = {"rundir": "/eagle/IRIBeta/als/bl832_test/raw", "h5_file_name": file_name, "folder_path": folder_name}
+    function_inputs = {"rundir": "/eagle/IRIBeta/als/bl832_test/raw",
+                       "h5_file_name": file_name,
+                       "folder_path": folder_name}
 
     # Define the json flow
     class FlowInput(BaseModel):
@@ -331,7 +332,9 @@ def alcf_tomopy_reconstruction_flow(
 
     try:
         logger.info("Starting globus flow action")
-        flow_action = specific_flow_client.run_flow(flow_input.dict(), label="ALS run", tags=["demo", "als", "tomopy"])
+        flow_action = specific_flow_client.run_flow(flow_input.dict(),
+                                                    label="ALS run",
+                                                    tags=["demo", "als", "tomopy"])
         flow_run_id = flow_action['action_id']
         logger.info(flow_action)
         logger.info(f'Flow action started with id: {flow_run_id}')
@@ -362,7 +365,7 @@ def alcf_tomopy_reconstruction_flow(
         # Stop the timer and calculate the duration
         elapsed_time = time.time() - start_time
         logger.info(f"Total duration of the flow operation: {elapsed_time:.2f} seconds.")
-    
+
     return success
 
 
@@ -373,7 +376,7 @@ def process_new_832_ALCF_flow(folder_name: str,
                               send_to_alcf: bool = True) -> list:
     """
     Process and transfer a file from a source to the ALCF.
-    
+
     Args:
         folder_name (str): The name of the project folder. Ex: "BLS-00564_dyparkinson"
         file_name (str): The name of the file to be processed. Ex: "20230224_132553_sea_shell"
@@ -381,13 +384,12 @@ def process_new_832_ALCF_flow(folder_name: str,
         send_to_alcf (bool, optional): Defaults to True. Whether to send the file to the ALCF.
 
     Returns:
-        list: A list of booleans indicating the success of each step (transfer to ALCF, reconstruction, transfer back to NERSC).
+        list: Booleans indicating the success of each step (transfer to ALCF, recon, transfer to NERSC).
 
     """
     logger = get_run_logger()
     logger.info("Starting flow for new file processing and transfer.")
     config = Config832()
-    
 
     # Send data from NERSC to ALCF, reconstructions run on ALCF and tiffs sent back to NERSC
     if not is_export_control and send_to_alcf:
@@ -398,31 +400,37 @@ def process_new_832_ALCF_flow(folder_name: str,
         scratch_path_tiff = folder_name + '/rec' + file_name + '/'
         scratch_path_zarr = folder_name + '/rec' + file_name + '.zarr/'
 
-
         # Step 1: Transfer data from NERSC to ALCF
         logger.info(f"Transferring {file_name} from NERSC to {alcf_raw_path} at ALCF")
-        alcf_transfer_success = transfer_data_to_alcf(folder_name+'/'+h5_file_name, config.tc, config.nersc_test, config.alcf832_raw) #        # alcf_transfer_success = transfer_data_to_alcf(h5_file_name, config.tc, config.nersc832_alsdev_raw, config.alcf832_raw)
+        alcf_transfer_success = transfer_data_to_alcf(folder_name+'/'+h5_file_name,
+                                                      config.tc,
+                                                      config.nersc_test,
+                                                      config.alcf832_raw)
         logger.info(f"Transfer status: {alcf_transfer_success}")
         if not alcf_transfer_success:
             logger.error("Transfer failed due to configuration or authorization issues.")
         else:
             logger.info("Transfer successful.")
 
-
         # Step 2: Run the Tomopy reconstruction flow
         logger.info(f"Running Tomopy reconstruction on {file_name} at ALCF")
-        alcf_reconstruction_success = alcf_tomopy_reconstruction_flow(raw_path=alcf_raw_path, scratch_path=alcf_scratch_path, folder_name=folder_name, file_name=h5_file_name)
+        alcf_reconstruction_success = alcf_tomopy_reconstruction_flow(raw_path=alcf_raw_path,
+                                                                      scratch_path=alcf_scratch_path,
+                                                                      folder_name=folder_name,
+                                                                      file_name=h5_file_name)
         if not alcf_reconstruction_success:
             logger.error("Reconstruction Failed.")
         else:
             logger.info("Reconstruction Successful.")
 
-
         # Step 3: Send reconstructed data (tiffs and zarr) to NERSC
         # Send reconstructed data (tiff) to NERSC
         logger.info(f"Transferring {file_name} from {alcf_raw_path} at ALCF to {nersc_scratch_path} at NERSC")
         logger.info(f"Reconstructed file path: {scratch_path_tiff}")
-        nersc_transfer_success = transfer_data_to_nersc(scratch_path_tiff, config.tc, config.alcf832_scratch, config.nersc832_alsdev_scratch)
+        nersc_transfer_success = transfer_data_to_nersc(scratch_path_tiff,
+                                                        config.tc,
+                                                        config.alcf832_scratch,
+                                                        config.nersc832_alsdev_scratch)
         if not nersc_transfer_success:
             logger.error("Transfer failed due to configuration or authorization issues.")
         else:
@@ -431,22 +439,26 @@ def process_new_832_ALCF_flow(folder_name: str,
         # Send reconstructed data (zarr) to NERSC
         logger.info(f"Transferring {file_name} from {alcf_raw_path} at ALCF to {nersc_scratch_path} at NERSC")
         logger.info(f"Reconstructed file path: {scratch_path_zarr}")
-        nersc_transfer_success = transfer_data_to_nersc(scratch_path_zarr, config.tc, config.alcf832_scratch, config.nersc832_alsdev_scratch)
+        nersc_transfer_success = transfer_data_to_nersc(scratch_path_zarr,
+                                                        config.tc,
+                                                        config.alcf832_scratch,
+                                                        config.nersc832_alsdev_scratch)
         if not nersc_transfer_success:
             logger.error("Transfer failed due to configuration or authorization issues.")
         else:
             logger.info("Transfer successful.")
 
-
         # Step 4: Send reconstructed data to data832/scratch
         # data832_scratch_path = f"8.3.2/scratch/{folder_name}"
-        # logger.info(f"Transferring {file_name} from {alcf_raw_path} at ALCF to {data832_scratch_path} at data832")
-        # data832_transfer_success = transfer_data_to_data832(reconstructed_file_path, config.tc, config.alcf832_scratch, config.data832)
+        # logger.info(f"Transferring {file_name} from {alcf_raw_path} (ALCF) to {data832_scratch_path} (data832)")
+        # data832_transfer_success = transfer_data_to_data832(reconstructed_file_path,
+        #                                                     config.tc,
+        #                                                     config.alcf832_scratch,
+        #                                                     config.data832)
         # if not nersc_transfer_success:
         #     logger.error("Transfer failed due to configuration or authorization issues.")
         # else:
         #     logger.info("Transfer successful.")
-
 
         # Step 5: Schedule deletion of files from ALCF, NERSC, and data832
         logger.info("Scheduling deletion of files from ALCF, NERSC, and data832")
@@ -454,20 +466,24 @@ def process_new_832_ALCF_flow(folder_name: str,
         alcf_reconstruction_success = True
         nersc_transfer_success = True
         schedule_pruning(
-            alcf_raw_path = f"{folder_name}/{h5_file_name}" if alcf_transfer_success else None,
-            alcf_scratch_path_tiff  = f"{scratch_path_tiff}" if alcf_reconstruction_success else None,
-            alcf_scratch_path_zarr  = f"{scratch_path_zarr}" if alcf_reconstruction_success else None,
-            nersc_scratch_path_tiff = f"{scratch_path_tiff}" if nersc_transfer_success else None,
-            nersc_scratch_path_zarr = f"{scratch_path_zarr}" if nersc_transfer_success else None,
+            alcf_raw_path=f"{folder_name}/{h5_file_name}" if alcf_transfer_success else None,
+            alcf_scratch_path_tiff=f"{scratch_path_tiff}" if alcf_reconstruction_success else None,
+            alcf_scratch_path_zarr=f"{scratch_path_zarr}" if alcf_reconstruction_success else None,
+            nersc_scratch_path_tiff=f"{scratch_path_tiff}" if nersc_transfer_success else None,
+            nersc_scratch_path_zarr=f"{scratch_path_zarr}" if nersc_transfer_success else None,
             # data832_scratch_path = data832_scratch_path if data832_transfer_success else None
-            one_minute = True # Set to False for production durations
+            one_minute=True  # Set to False for production durations
         )
 
         # Step 6: ingest into scicat ... todo
-        logger.info(f"alcf_transfer_success: {alcf_transfer_success}, alcf_reconstruction_success: {alcf_reconstruction_success}, nersc_transfer_success: {nersc_transfer_success}")
+        logger.info(
+            f"alcf_transfer_success: {alcf_transfer_success}, "
+            f"alcf_reconstruction_success: {alcf_reconstruction_success}, "
+            f"nersc_transfer_success: {nersc_transfer_success}"
+        )
 
         return [alcf_transfer_success, alcf_reconstruction_success, nersc_transfer_success]
-        
+
     else:
         logger.info("Export control is enabled or send_to_alcf is set to False. No action taken.")
         return [False, False, False]
@@ -476,5 +492,8 @@ def process_new_832_ALCF_flow(folder_name: str,
 if __name__ == "__main__":
     folder_name = str('BLS-00564_dyparkinson')
     file_name = str('20230224_132553_sea_shell')
-    flow_success = process_new_832_ALCF_flow(folder_name=folder_name, file_name=file_name, is_export_control=False, send_to_alcf=True)
+    flow_success = process_new_832_ALCF_flow(folder_name=folder_name,
+                                             file_name=file_name,
+                                             is_export_control=False,
+                                             send_to_alcf=True)
     print(flow_success)

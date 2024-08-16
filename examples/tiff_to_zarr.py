@@ -2,21 +2,24 @@
 
 import os
 import argparse
-import zarr
 from ngff_zarr import (
     detect_cli_io_backend,
     cli_input_to_ngff_image,
     to_multiscales,
     to_ngff_zarr,
-    Methods,
-    config
+    Methods
 )
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Convert TIFF files to NGFF Zarr format.')
     parser.add_argument('tiff_directory', type=str, help='Directory containing the TIFF files.')
-    parser.add_argument('--zarr_directory', type=str, default=None, help='Directory to store the Zarr output. Defaults to a new folder in the input directory.')
+    parser.add_argument('--zarr_directory',
+                        type=str,
+                        default=None,
+                        help='Directory to store Zarr output. Default is new folder in input directory.')
     return parser.parse_args()
+
 
 def set_permissions_recursive(path, permissions=0o2775):
     for root, dirs, files in os.walk(path):
@@ -26,11 +29,12 @@ def set_permissions_recursive(path, permissions=0o2775):
             os.chmod(os.path.join(root, file), permissions)
     os.chmod(path, permissions)  # Also set permissions for the top-level directory
 
+
 def main():
     args = parse_arguments()
 
     tiff_dir = args.tiff_directory
-    zarr_dir = args.zarr_directory 
+    zarr_dir = args.zarr_directory
 
     if not os.path.isdir(tiff_dir):
         raise TypeError("The specified TIFF directory is not a valid directory")
@@ -51,7 +55,6 @@ def main():
     print('Output directory: ' + zarr_dir)
 
     # Build NGFF Zarr directory
-    # config.cache_store = zarr.storage.DirectoryStore("/alsuser/pscratch/zarr-ngff-cache", dimension_separator="/")
     backend = detect_cli_io_backend(file_paths)
     image = cli_input_to_ngff_image(backend, file_paths)
     # The scale and axis units are the same as the one printed in the reconstruction script

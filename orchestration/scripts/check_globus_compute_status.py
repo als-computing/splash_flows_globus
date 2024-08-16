@@ -18,8 +18,6 @@ def get_login_manager(client_id, client_secret):
     :param client_secret: Globus client secret
     :return: LoginManager instance
     """
-    # Define the scopes
-    scopes = ["urn:globus:auth:scope:compute.api.globus.org:all"]
 
     # Create a ConfidentialAppAuthClient
     auth_client = ConfidentialAppAuthClient(client_id, client_secret)
@@ -29,7 +27,7 @@ def get_login_manager(client_id, client_secret):
         auth_client,
         scopes=[ComputeScopes.all]
     )
-    
+
     # Create and return a LoginManager
     return LoginManager()
 
@@ -57,6 +55,7 @@ def check_endpoint(endpoint_id):
         print(f"Endpoint {endpoint_id} status: {endpoint_status}")
     except Exception as e:
         print(f"Failed to check endpoint status: {e}")
+
 
 if __name__ == "__main__":
     endpoint_id = "UUID"
