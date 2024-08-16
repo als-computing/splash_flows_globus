@@ -21,11 +21,11 @@ warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
 @pytest.fixture(autouse=True, scope="session")
 def prefect_test_fixture():
     """
-    A pytest fixture that automatically sets up and tears down the Prefect test harness 
-    for the entire test session. It creates and saves test secrets and configurations 
+    A pytest fixture that automatically sets up and tears down the Prefect test harness
+    for the entire test session. It creates and saves test secrets and configurations
     required for Globus integration.
 
-    This fixture ensures that the Prefect environment is properly isolated and mocked 
+    This fixture ensures that the Prefect environment is properly isolated and mocked
     during testing.
 
     Yields:
@@ -44,14 +44,14 @@ def prefect_test_fixture():
 @pytest.fixture(autouse=True)
 def set_env_vars(monkeypatch):
     """
-    A pytest fixture that automatically sets environment variables required for 
+    A pytest fixture that automatically sets environment variables required for
     Globus Compute SDK and Globus Flows during each test.
 
-    The fixture uses monkeypatching to mock environment variables, ensuring 
+    The fixture uses monkeypatching to mock environment variables, ensuring
     that the tests don't rely on real environment configurations.
 
     Args:
-        monkeypatch: A pytest fixture that allows modifying environment variables 
+        monkeypatch: A pytest fixture that allows modifying environment variables
                      for the duration of the test.
 
     Yields:
@@ -65,15 +65,15 @@ def set_env_vars(monkeypatch):
 @pytest.fixture(autouse=True)
 def mock_globus_compute_client(monkeypatch):
     """
-    A pytest fixture that automatically mocks the Globus Compute SDK's Client 
+    A pytest fixture that automatically mocks the Globus Compute SDK's Client
     class to avoid real network calls during testing.
 
-    This fixture replaces the Client class methods with mock implementations 
-    that return predefined values, ensuring that tests are isolated from 
+    This fixture replaces the Client class methods with mock implementations
+    that return predefined values, ensuring that tests are isolated from
     external dependencies.
 
     Args:
-        monkeypatch: A pytest fixture that allows monkeypatching class methods 
+        monkeypatch: A pytest fixture that allows monkeypatching class methods
                      for the duration of the test.
 
     Yields:
