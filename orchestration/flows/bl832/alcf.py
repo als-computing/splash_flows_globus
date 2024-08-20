@@ -11,8 +11,9 @@ import os
 from pathlib import Path
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import JSON
-from pydantic import BaseModel
+# from pydantic import BaseModel
 import time
+from prefect.blocks.system import Secret
 
 
 dotenv_file = load_dotenv()
@@ -278,61 +279,79 @@ def alcf_tomopy_reconstruction_flow(
 
     # Initialize the Globus Compute Client
     gcc = Client()
-    polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT")  # COMPUTE endpoint, not TRANSFER endpoint
-    gce = Executor(endpoint_id=polaris_endpoint_id, client=gcc)
+    # polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT")  # COMPUTE endpoint, not TRANSFER endpoint
+    # reconstruction_func = os.getenv("GLOBUS_RECONSTRUCTION_FUNC")
+    # source_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
+    # destination_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
 
-    reconstruction_func = os.getenv("GLOBUS_RECONSTRUCTION_FUNC")
-    source_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
-    destination_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
+    polaris_endpoint_id = Secret.load("globus-compute-endpoint")
+    if polaris_endpoint_id is None:
+        logger.error("Failed to load the secret 'globus-compute-endpoint'")
+    gce = Executor(endpoint_id=polaris_endpoint_id.get(), client=gcc)
+
+    reconstruction_func = Secret.load("globus-reconstruction-function")
+    source_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
+    destination_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
+
+    # logger.info(f"Using compute_endpoint_id: {polaris_endpoint_id.get()}")
+    # logger.info(f"Using reconstruction_func: {reconstruction_func.get()}")
+    # logger.info(f"Using source_collection_endpoint: {source_collection_endpoint.get()}")
 
     function_inputs = {"rundir": "/eagle/IRIBeta/als/bl832_test/raw",
                        "h5_file_name": file_name,
                        "folder_path": folder_name}
 
     # Define the json flow
-    class FlowInput(BaseModel):
-        source: dict
-        destination: dict
-        recursive_tx: bool
-        compute_endpoint_id: str
-        compute_function_id: str
-        compute_function_kwargs: dict
+    # class FlowInput(BaseModel):
+    #     source: dict
+    #     destination: dict
+    #     recursive_tx: bool
+    #     compute_endpoint_id: str
+    #     compute_function_id: str
+    #     compute_function_kwargs: dict
 
-    flow_input = FlowInput(
-        source={
-            "id": source_collection_endpoint,
-            "path": raw_path
-        },
-        destination={
-            "id": destination_collection_endpoint,
-            "path": scratch_path
-        },
-        recursive_tx=True,
-        compute_endpoint_id=polaris_endpoint_id,
-        compute_function_id=reconstruction_func,
-        compute_function_kwargs=function_inputs
-    )
+    # flow_input = FlowInput(
 
-    collection_ids = [flow_input.source["id"], flow_input.destination["id"]]
+    flow_input = {
+        "input": {
+            "source": {
+                "id": source_collection_endpoint.get(),
+                "path": raw_path
+            },
+            "destination": {
+                "id": destination_collection_endpoint.get(),
+                "path": scratch_path
+            },
+            "recursive_tx": True,
+            "compute_endpoint_id": polaris_endpoint_id.get(),
+            "compute_function_id": reconstruction_func.get(),
+            "compute_function_kwargs": function_inputs
+        }
+    }
+
+    collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
+
+    # collection_ids = [flow_input.source["id"], flow_input.destination["id"]]
 
     # Flow ID (only generate once!)
-    flow_id = os.getenv("GLOBUS_FLOW_ID")
+    # flow_id = os.getenv("GLOBUS_FLOW_ID")
+    flow_id = Secret.load("globus-flow-id")
 
-    logger.info(f"reconstruction_func: {reconstruction_func}")
-    logger.info(f"flow_id: {flow_id}")
+    logger.info(f"reconstruction_func: {reconstruction_func.get()}")
+    logger.info(f"flow_id: {flow_id.get()}")
 
     # Start the timer
     start_time = time.time()
 
     # Run the flow
     flow_client = get_flows_client()
-    specific_flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
+    specific_flow_client = get_specific_flow_client(flow_id.get(), collection_ids=collection_ids)
 
     success = False
 
     try:
         logger.info("Starting globus flow action")
-        flow_action = specific_flow_client.run_flow(flow_input.dict(),
+        flow_action = specific_flow_client.run_flow(flow_input,
                                                     label="ALS run",
                                                     tags=["demo", "als", "tomopy"])
         flow_run_id = flow_action['action_id']

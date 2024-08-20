@@ -9,6 +9,7 @@ from globus_sdk import (
 from globus_sdk.scopes import TransferScopes, GCSCollectionScopeBuilder, MutableScope
 from globus_sdk.tokenstorage import SimpleJSONFileAdapter
 from pprint import pprint
+from prefect.blocks.system import Secret
 
 MY_FILE_ADAPTER = SimpleJSONFileAdapter(os.path.expanduser("~/.sdk-manage-flow.json"))
 
@@ -18,8 +19,11 @@ TRANSFER_ACTION_PROVIDER_SCOPE_STRING = (
 
 dotenv_file = load_dotenv()
 
-GLOBUS_CLIENT_ID = os.getenv("GLOBUS_CLIENT_ID")
-GLOBUS_CLIENT_SECRET = os.getenv("GLOBUS_CLIENT_SECRET")
+# GLOBUS_CLIENT_ID = os.getenv("GLOBUS_CLIENT_ID")
+# GLOBUS_CLIENT_SECRET = os.getenv("GLOBUS_CLIENT_SECRET")
+
+GLOBUS_CLIENT_ID = Secret.load("globus-client-id")
+GLOBUS_CLIENT_SECRET = Secret.load("globus-client-secret")
 
 
 def do_login_flow(scopes, native_client):
@@ -35,7 +39,7 @@ def do_login_flow(scopes, native_client):
 def get_manage_flow_authorizer(client_id):
     # native_client = globus_sdk.NativeAppAuthClient(client_id)
     confidential_client = globus_sdk.ConfidentialAppAuthClient(
-        client_id=GLOBUS_CLIENT_ID, client_secret=GLOBUS_CLIENT_SECRET
+        client_id=GLOBUS_CLIENT_ID.get(), client_secret=GLOBUS_CLIENT_SECRET.get()
     )
     # resource_server = globus_sdk.FlowsClient.resource_server
     all_scopes = [
@@ -50,7 +54,7 @@ def get_manage_flow_authorizer(client_id):
 def get_flows_client():
     # native_client = globus_sdk.NativeAppAuthClient(client_id)
     confidential_client = globus_sdk.ConfidentialAppAuthClient(
-        client_id=GLOBUS_CLIENT_ID, client_secret=GLOBUS_CLIENT_SECRET
+        client_id=GLOBUS_CLIENT_ID.get(), client_secret=GLOBUS_CLIENT_SECRET.get()
     )
 
     # resource_server = globus_sdk.FlowsClient.resource_server
@@ -66,7 +70,7 @@ def get_flows_client():
 
 def get_specific_flow_client(flow_id, collection_ids=None):
     confidential_client = ConfidentialAppAuthClient(
-        client_id=GLOBUS_CLIENT_ID, client_secret=GLOBUS_CLIENT_SECRET
+        client_id=GLOBUS_CLIENT_ID.get(), client_secret=GLOBUS_CLIENT_SECRET.get()
     )
 
     assert collection_ids, "Why don't we have a collection id??"

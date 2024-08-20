@@ -34,8 +34,22 @@ def prefect_test_fixture():
     with prefect_test_harness():
         globus_client_id = Secret(value="test-globus-client-id")
         globus_client_id.save(name="globus-client-id")
+        
         globus_client_secret = Secret(value="your_globus_client_secret")
         globus_client_secret.save(name="globus-client-secret")
+        
+        globus_compute_endpoint = Secret(value="globus-compute-endpoint")
+        globus_compute_endpoint.save(name="globus-compute-endpoint")
+        
+        globus_reconstruction_function = Secret(value="globus-reconstruction-function")
+        globus_reconstruction_function.save(name="globus-reconstruction-function")
+        
+        globus_iribeta_cgs_endpoint = Secret(value="globus-iribeta-cgs-endpoint")
+        globus_iribeta_cgs_endpoint.save(name="globus-iribeta-cgs-endpoint")
+        
+        globus_flow_id = Secret(value="globus-flow-id")
+        globus_flow_id.save(name="globus-flow-id")
+        
         pruning_config = JSON(value={"max_wait_seconds": 600})
         pruning_config.save(name="pruning-config")
         yield

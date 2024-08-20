@@ -1,35 +1,21 @@
 #!/usr/bin/env python
-
 import os
 from dotenv import load_dotenv
-from globus_sdk import ConfidentialAppAuthClient, ClientCredentialsAuthorizer
-from globus_compute_sdk.sdk.login_manager import LoginManager, ComputeScopes
+from globus_compute_sdk.sdk.login_manager import LoginManager
 from globus_compute_sdk import Client
 
 # Load environment variables from .env file
 load_dotenv()
 
 
-def get_login_manager(client_id, client_secret):
+def get_login_manager(environment: str = None) -> LoginManager:
     """
     Create and return a LoginManager instance for Globus Compute.
 
-    :param client_id: Globus client ID
-    :param client_secret: Globus client secret
+    :param environment: Optional environment name for token storage.
     :return: LoginManager instance
     """
-
-    # Create a ConfidentialAppAuthClient
-    auth_client = ConfidentialAppAuthClient(client_id, client_secret)
-
-    # Create an authorizer
-    authorizer = ClientCredentialsAuthorizer(
-        auth_client,
-        scopes=[ComputeScopes.all]
-    )
-
-    # Create and return a LoginManager
-    return LoginManager()
+    return LoginManager(environment=environment)
 
 
 def check_endpoint(endpoint_id):
@@ -40,12 +26,11 @@ def check_endpoint(endpoint_id):
     :return: None
     """
     try:
-        # Retrieve client ID and secret from environment variables
-        GLOBUS_CLIENT_ID = os.getenv("GLOBUS_CLIENT_ID")
-        GLOBUS_CLIENT_SECRET = os.getenv("GLOBUS_CLIENT_SECRET")
-
         # Initialize the LoginManager
-        login_manager = get_login_manager(GLOBUS_CLIENT_ID, GLOBUS_CLIENT_SECRET)
+        login_manager = get_login_manager()
+
+        # Ensure the user is logged in
+        login_manager.ensure_logged_in()
 
         # Initialize the Globus Compute client with the LoginManager
         compute_client = Client(login_manager=login_manager)
@@ -58,5 +43,12 @@ def check_endpoint(endpoint_id):
 
 
 if __name__ == "__main__":
-    endpoint_id = "UUID"
+    """
+    Check the status of the Globus Compute endpoint specified by the
+    GLOBUS_COMPUTE_ENDPOINT environment variable.
+
+    IMPORTANT: run this in the terminal to login before running this script:
+    export export GLOBUS_COMPUTE_CLIENT_ID="uuid" & GLOBUS_COMPUTE_CLIENT_SECRET="uuid"
+    """
+    endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT")
     check_endpoint(endpoint_id)
