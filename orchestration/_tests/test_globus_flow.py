@@ -1,21 +1,30 @@
-from globus_sdk import ConfidentialAppAuthClient, TransferClient
-from globus_sdk.authorizers.client_credentials import ClientCredentialsAuthorizer
-from globus_compute_sdk.sdk.client import Client
-from orchestration.flows.bl832.alcf import (
-    process_new_832_ALCF_flow
-)
-from orchestration.flows.bl832.config import Config832
-from prefect.testing.utilities import prefect_test_harness
-from prefect.blocks.system import JSON, Secret
-from pydantic import BaseModel, ConfigDict, PydanticDeprecatedSince20
-import pytest
-from typing import List, Optional, Dict, Any
-from unittest.mock import MagicMock, patch, call
-from uuid import UUID, uuid4
-import warnings
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
+# Mock Secret.load globally at the start of the file
+mock_secret = MagicMock()
+mock_secret.value = str(uuid4())
+with patch('prefect.blocks.system.Secret.load', return_value=mock_secret):
+    from globus_sdk import ConfidentialAppAuthClient, TransferClient
+    from globus_sdk.authorizers.client_credentials import ClientCredentialsAuthorizer
+    from globus_compute_sdk.sdk.client import Client
+    from orchestration.flows.bl832.alcf import (
+        process_new_832_ALCF_flow
+    )
+    from orchestration.flows.bl832.config import Config832
+    from prefect.testing.utilities import prefect_test_harness
+    from prefect.blocks.system import JSON, Secret
+    from pydantic import BaseModel, ConfigDict, PydanticDeprecatedSince20
+    import pytest
+    from typing import List, Optional, Dict, Any
+    from unittest.mock import MagicMock, patch, call
+    from uuid import UUID, uuid4
+    import warnings
+
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
+
+# Continue with the rest of your test code
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -25,31 +34,28 @@ def prefect_test_fixture():
     for the entire test session. It creates and saves test secrets and configurations
     required for Globus integration.
 
-    This fixture ensures that the Prefect environment is properly isolated and mocked
-    during testing.
-
     Yields:
         None
     """
     with prefect_test_harness():
-        globus_client_id = Secret(value="test-globus-client-id")
+        globus_client_id = Secret(value=str(uuid4()))
         globus_client_id.save(name="globus-client-id")
-        
-        globus_client_secret = Secret(value="your_globus_client_secret")
+
+        globus_client_secret = Secret(value=str(uuid4()))
         globus_client_secret.save(name="globus-client-secret")
-        
-        globus_compute_endpoint = Secret(value="globus-compute-endpoint")
+
+        globus_compute_endpoint = Secret(value=str(uuid4()))
         globus_compute_endpoint.save(name="globus-compute-endpoint")
-        
-        globus_reconstruction_function = Secret(value="globus-reconstruction-function")
+
+        globus_reconstruction_function = Secret(value=str(uuid4()))
         globus_reconstruction_function.save(name="globus-reconstruction-function")
-        
-        globus_iribeta_cgs_endpoint = Secret(value="globus-iribeta-cgs-endpoint")
+
+        globus_iribeta_cgs_endpoint = Secret(value=str(uuid4()))
         globus_iribeta_cgs_endpoint.save(name="globus-iribeta-cgs-endpoint")
-        
-        globus_flow_id = Secret(value="globus-flow-id")
+
+        globus_flow_id = Secret(value=str(uuid4()))
         globus_flow_id.save(name="globus-flow-id")
-        
+
         pruning_config = JSON(value={"max_wait_seconds": 600})
         pruning_config.save(name="pruning-config")
         yield
