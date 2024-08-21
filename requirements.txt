@@ -5,7 +5,7 @@ numpy
 pillow
 python-dotenv
 prefect==2.19.5
-pyscicat @ git+https://github.com/dylanmcreynolds/pyscicat@fix_auth
+pyscicat
 pyyaml
 authlib
 sfapi_client
