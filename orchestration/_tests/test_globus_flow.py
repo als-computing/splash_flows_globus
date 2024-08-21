@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-# Mock Secret.load globally at the start of the file
 mock_secret = MagicMock()
 mock_secret.value = str(uuid4())
 with patch('prefect.blocks.system.Secret.load', return_value=mock_secret):
@@ -23,8 +22,6 @@ with patch('prefect.blocks.system.Secret.load', return_value=mock_secret):
 
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
-
-# Continue with the rest of your test code
 
 
 @pytest.fixture(autouse=True, scope="session")
