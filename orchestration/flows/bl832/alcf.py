@@ -392,7 +392,8 @@ def alcf_tomopy_reconstruction_flow(
 def process_new_832_ALCF_flow(folder_name: str,
                               file_name: str,
                               is_export_control: bool = False,
-                              send_to_alcf: bool = True) -> list:
+                              send_to_alcf: bool = True,
+                              config=None) -> list:
     """
     Process and transfer a file from a source to the ALCF.
 
@@ -408,7 +409,8 @@ def process_new_832_ALCF_flow(folder_name: str,
     """
     logger = get_run_logger()
     logger.info("Starting flow for new file processing and transfer.")
-    config = Config832()
+    if not config:
+        config = Config832()
 
     # Send data from NERSC to ALCF, reconstructions run on ALCF and tiffs sent back to NERSC
     if not is_export_control and send_to_alcf:
