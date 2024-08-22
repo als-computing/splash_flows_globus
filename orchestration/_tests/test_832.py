@@ -4,15 +4,6 @@ from uuid import uuid4
 import time
 
 from globus_sdk import TransferData
-from pytest import MonkeyPatch
-
-# Mock Secret.load globally at the start of the file
-mock_secret = MagicMock()
-mock_secret.value = str(uuid4())
-with patch('prefect.blocks.system.Secret.load', return_value=mock_secret):
-    # Import modules that might use Prefect secrets
-    from ..flows.bl832 import move
-    from orchestration.flows.bl832.move import process_new_832_file
 
 
 class MockTransferClient:

@@ -9,7 +9,6 @@ from prefect.blocks.system import JSON, Secret
 from pydantic import BaseModel, ConfigDict, PydanticDeprecatedSince20
 import pytest
 from pytest_mock import MockFixture
-# from unittest.mock import MagicMock, patch, call
 
 from .test_globus import MockTransferClient
 
@@ -214,11 +213,15 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
 
     # Mock the Config832 class inserting into the module being tested
     mock_config = MockConfig832()
-   
-    mock_transfer_to_alcf = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_alcf', return_value=True)
-    mock_reconstruction_flow = mocker.patch('orchestration.flows.bl832.alcf.alcf_tomopy_reconstruction_flow', return_value=True)
-    mock_transfer_to_nersc = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_nersc', return_value=True)
-    mock_schedule_pruning = mocker.patch('orchestration.flows.bl832.alcf.schedule_pruning', return_value=True)
+
+    mock_transfer_to_alcf = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_alcf',
+                                         return_value=True)
+    mock_reconstruction_flow = mocker.patch('orchestration.flows.bl832.alcf.alcf_tomopy_reconstruction_flow',
+                                            return_value=True)
+    mock_transfer_to_nersc = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_nersc',
+                                          return_value=True)
+    mock_schedule_pruning = mocker.patch('orchestration.flows.bl832.alcf.schedule_pruning',
+                                         return_value=True)
 
     alcf_raw_path = f"{folder_name}/{file_name}.h5" if True else None
     scratch_path_tiff = f"{folder_name}/rec{file_name}/" if True else None
@@ -241,8 +244,10 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
                                                      folder_name=folder_name, file_name=f"{file_name}.h5")
 
     mock_transfer_to_nersc.assert_has_calls([
-        mocker.call(scratch_path_tiff, mock_config.tc, mock_config.alcf832_scratch, mock_config.nersc832_alsdev_scratch),
-        mocker.call(scratch_path_zarr, mock_config.tc, mock_config.alcf832_scratch, mock_config.nersc832_alsdev_scratch)
+        mocker.call(scratch_path_tiff,
+                    mock_config.tc, mock_config.alcf832_scratch, mock_config.nersc832_alsdev_scratch),
+        mocker.call(scratch_path_zarr,
+                    mock_config.tc, mock_config.alcf832_scratch, mock_config.nersc832_alsdev_scratch)
     ])
 
     mock_schedule_pruning.assert_called_once_with(
@@ -305,4 +310,3 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_schedule_pruning.assert_not_called()
     assert isinstance(result, list), "Result should be a list"
     assert result == [False, False, False], "Result does not match expected values"
-

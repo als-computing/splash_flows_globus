@@ -1,19 +1,19 @@
 import datetime
 from dotenv import load_dotenv
+import os
+from pathlib import Path
+import time
+
 from globus_compute_sdk import Client, Executor
 import globus_sdk
 from globus_sdk import TransferClient
+from prefect import flow, task, get_run_logger
+from prefect.blocks.system import JSON, Secret
+
 from orchestration.flows.bl832.config import Config832
 from orchestration.globus.flows import get_flows_client, get_specific_flow_client
 from orchestration.globus.transfer import GlobusEndpoint, start_transfer
 from orchestration.prefect import schedule_prefect_flow
-import os
-from pathlib import Path
-from prefect import flow, task, get_run_logger
-from prefect.blocks.system import JSON
-# from pydantic import BaseModel
-import time
-from prefect.blocks.system import Secret
 
 
 dotenv_file = load_dotenv()
@@ -279,10 +279,6 @@ def alcf_tomopy_reconstruction_flow(
 
     # Initialize the Globus Compute Client
     gcc = Client()
-    # polaris_endpoint_id = os.getenv("GLOBUS_COMPUTE_ENDPOINT")  # COMPUTE endpoint, not TRANSFER endpoint
-    # reconstruction_func = os.getenv("GLOBUS_RECONSTRUCTION_FUNC")
-    # source_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
-    # destination_collection_endpoint = os.getenv("GLOBUS_IRIBETA_CGS_ENDPOINT")
 
     polaris_endpoint_id = Secret.load("globus-compute-endpoint")
     if polaris_endpoint_id is None:
@@ -294,7 +290,7 @@ def alcf_tomopy_reconstruction_flow(
     destination_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
 
     # logger.info(f"Using compute_endpoint_id: {polaris_endpoint_id.get()}")
-    # logger.info(f"Using reconstruction_func: {reconstruction_func.get()}")
+    logger.info(f"Using reconstruction_func: {reconstruction_func.get()}")
     # logger.info(f"Using source_collection_endpoint: {source_collection_endpoint.get()}")
 
     function_inputs = {"rundir": "/eagle/IRIBeta/als/bl832_test/raw",
@@ -331,10 +327,7 @@ def alcf_tomopy_reconstruction_flow(
 
     collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
 
-    # collection_ids = [flow_input.source["id"], flow_input.destination["id"]]
-
     # Flow ID (only generate once!)
-    # flow_id = os.getenv("GLOBUS_FLOW_ID")
     flow_id = Secret.load("globus-flow-id")
 
     logger.info(f"reconstruction_func: {reconstruction_func.get()}")
