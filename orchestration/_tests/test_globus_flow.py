@@ -205,7 +205,7 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_secret.value = str(uuid4())
     # https://pytest-mock.readthedocs.io/en/latest/usage.html#usage-as-context-manager
     with mocker.patch('prefect.blocks.system.Secret.load', return_value=mock_secret):
-        from orchestration.flows.bl832.alcf import process_new_832_ALCF_flow
+        from orchestration.scripts.alcf import process_new_832_ALCF_flow
 
     """Test for the process of a new 832 ALCF flow"""
     folder_name = "test_folder"
