@@ -214,13 +214,13 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     # Mock the Config832 class inserting into the module being tested
     mock_config = MockConfig832()
 
-    mock_transfer_to_alcf = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_alcf',
+    mock_transfer_to_alcf = mocker.patch('orchestration.scripts.alcf.transfer_data_to_alcf',
                                          return_value=True)
-    mock_reconstruction_flow = mocker.patch('orchestration.flows.bl832.alcf.alcf_tomopy_reconstruction_flow',
+    mock_reconstruction_flow = mocker.patch('orchestration.scripts.alcf.alcf_tomopy_reconstruction_flow',
                                             return_value=True)
-    mock_transfer_to_nersc = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_nersc',
+    mock_transfer_to_nersc = mocker.patch('orchestration.scripts.alcf.transfer_data_to_nersc',
                                           return_value=True)
-    mock_schedule_pruning = mocker.patch('orchestration.flows.bl832.alcf.schedule_pruning',
+    mock_schedule_pruning = mocker.patch('orchestration.scripts.alcf.schedule_pruning',
                                          return_value=True)
 
     alcf_raw_path = f"{folder_name}/{file_name}.h5" if True else None
