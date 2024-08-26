@@ -1,7 +1,9 @@
-from dotenv import load_dotenv
 from globus_compute_sdk import Client, Executor
-from orchestration.globus.flows import get_flows_client
+from prefect.blocks.system import Secret
+from prefect import task, flow, get_run_logger
 
+from check_globus_compute import check_globus_compute_status
+from orchestration.globus.flows import get_flows_client
 
 """
 init.py only needs to be run once to authenticate the polaris (alcf) endpoint ID on the target machine.
@@ -9,7 +11,19 @@ Additionally, it sets up the functions that will be used to transfer data.
 """
 
 
-def reconstruction_wrapper(rundir, parametersfile="inputOneSliceOfEach.txt"):
+@task
+def get_polaris_endpoint_id() -> str:
+    """
+    Get the UUID of the Polaris endpoint on ALCF.
+
+    :return: str - UUID of the Polaris endpoint.
+    """
+    compute_endpoint_id = Secret.load("globus-compute-endpoint").get()
+    check_globus_compute_status(compute_endpoint_id)
+    return compute_endpoint_id
+
+
+def reconstruction_wrapper(rundir, h5_file_name, folder_path):
     """
     Python function that wraps around the application call for Tomopy reconstruction on ALCF
 
@@ -21,23 +35,40 @@ def reconstruction_wrapper(rundir, parametersfile="inputOneSliceOfEach.txt"):
         str: confirmation message regarding reconstruction and time to completion
     """
     import os
-    import subprocess
     import time
-    try:
-        start = time.time()
+    import subprocess
 
-        # Move to directory where data are located
-        os.chdir(rundir)
+    rec_start = time.time()
 
-        # Run reconstruction.py
-        command = f"python /eagle/IRIBeta/als/example/reconstruction.py {parametersfile}"
-        res = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Move to directory where data are located
+    os.chdir(rundir)
 
-        end = time.time()
-        return f"Reconstructed data in {parametersfile} in {end-start:.2f} seconds;\n {res.stdout.decode()}"
+    # Run reconstruction.py
+    command = f"python /eagle/IRIBeta/als/example/test_recon.py {h5_file_name} {folder_path}"
+    recon_res = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    except Exception as e:
-        return f"Error during reconstruction: {str(e)}"
+    rec_end = time.time()
+
+    print(f"Reconstructed data in {folder_path}/{h5_file_name} in {rec_end-rec_start} seconds;\n {recon_res}")
+
+    start = time.time()
+
+    # Convert tiff files to zarr
+    file_name = h5_file_name[:-3] if h5_file_name.endswith('.h5') else h5_file_name
+    command = (
+        f"python /eagle/IRIBeta/als/example/tiff_to_zarr.py "
+        f"/eagle/IRIBeta/als/bl832_test/scratch/{folder_path}/rec{file_name}/"
+    )
+    zarr_res = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    end = time.time()
+
+    print(f"Converted tiff files to zarr in {end-start} seconds;\n {zarr_res}")
+
+    return (
+        f"Reconstructed data specified in {folder_path} / {h5_file_name} in {rec_end-rec_start} seconds;\n"
+        f"{recon_res} \nConverted tiff files to zarr in {end-start} seconds;\n {zarr_res}"
+    )
 
 
 def create_flow_definition():
@@ -82,23 +113,29 @@ def create_flow_definition():
     return flow_definition
 
 
-if __name__ == "__main__":
+@flow(name="setup-reconstruction-flow")
+def setup_reconstruction_flow() -> None:
+    logger = get_run_logger()
+
+    # Login to Globus Compute Endpoint
     gc = Client()
-    dotenv_file = load_dotenv()
-    polaris_endpoint_id = "UUID"
-    gce = Executor(endpoint_id=polaris_endpoint_id)
-    future = gce.submit(reconstruction_wrapper, "/eagle/IRIBeta/als/example")
-    # print(future.result())
+    gce = Executor(endpoint_id=get_polaris_endpoint_id())
+
     reconstruction_func = gc.register_function(reconstruction_wrapper)
+    logger.info(f"Registered function UUID: {reconstruction_func}")
     print(reconstruction_func)
-    future = gce.submit_to_registered_function(args=["/eagle/IRIBeta/als/example"],
-                                               function_id=reconstruction_func)
-    future.result()
-    flow_definition = create_flow_definition()
-    fc = get_flows_client()
-    flow = fc.create_flow(definition=flow_definition, title="Reconstruction flow", input_schema={})
+
+    flows_client = get_flows_client()
+    flow = flows_client.create_flow(definition=create_flow_definition(),
+                                    title="Reconstruction flow",
+                                    input_schema={})
     flow_id = flow['id']
-    print(flow)
+    logger.info(f"Created flow: {flow}")
+    logger.info(f"Flow UUID: {flow_id}")
+
     flow_scope = flow['globus_auth_scope']
-    print(f'Newly created flow with id:\n{flow_id}\nand scope:\n{flow_scope}')
-    # set_key(dotenv_file, "flow_id", str(flow_id))
+    logger.info(f'Flow scope:\n{flow_scope}')
+
+
+if __name__ == "__main__":
+    setup_reconstruction_flow()
