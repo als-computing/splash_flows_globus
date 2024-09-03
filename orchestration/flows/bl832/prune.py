@@ -107,6 +107,42 @@ def prune_alcf832_scratch(relative_path: str):
     )
 
 
+@flow(name="prune_data832_raw")
+def prune_data832_raw(relative_path: str):
+    p_logger = get_run_logger()
+    config = Config832()
+    pruning_config = JSON.load("pruning-config").value
+    max_wait_seconds = pruning_config["max_wait_seconds"]
+    p_logger.info(f"Pruning {relative_path} from {config.data832_raw}")
+    prune_one_safe(
+        file=relative_path,
+        if_older_than_days=0,
+        tranfer_client=config.tc,
+        source_endpoint=config.data832_raw,
+        check_endpoint=None,
+        logger=p_logger,
+        max_wait_seconds=max_wait_seconds,
+    )
+
+
+@flow(name="prune_data832_scratch")
+def prune_data832_scratch(relative_path: str):
+    p_logger = get_run_logger()
+    config = Config832()
+    pruning_config = JSON.load("pruning-config").value
+    max_wait_seconds = pruning_config["max_wait_seconds"]
+    p_logger.info(f"Pruning {relative_path} from {config.data832_scratch}")
+    prune_one_safe(
+        file=relative_path,
+        if_older_than_days=0,
+        tranfer_client=config.tc,
+        source_endpoint=config.data832_scratch,
+        check_endpoint=None,
+        logger=p_logger,
+        max_wait_seconds=max_wait_seconds,
+    )
+
+
 @flow(name="prune_nersc832_alsdev_scratch")
 def prune_nersc832_alsdev_scratch(relative_path: str):
     p_logger = get_run_logger()

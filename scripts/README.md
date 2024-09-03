@@ -1,8 +1,25 @@
 # 8.3.2 ALCF Globus Flow And Reconstruction Setup
 
-This script facilitates the transfer and processing of data files from the Advanced Light Source (ALS) at Berkeley Lab to the Argonne Leadership Computing Facility (ALCF) and the National Energy Research Scientific Computing Center (NERSC). It includes functions for transferring data using Globus and for performing tomographic reconstruction using Tomopy at ALCF.
+This script facilitates transferring and processing raw tomography data from Beamline 8.3.2 at Berkeley Lab's Advanced Light Source (ALS) to the Argonne Leadership Computing Facility (ALCF). This script relies on Prefect for workflow orchestration, Globus Transfer for data movement between facilities, and Globus Compute at ALCF for tomographic reconstruction using Tomopy.
 
-Follow these steps to log in to ALCF Polaris, start a Globus compute endpoint signed in using a Globus confidential client, register a reconstruction function and flow, and run the flow using `orchestration/flows/bl832/alcf.py`.
+Follow these steps to log in to ALCF Polaris, start a Globus compute endpoint signed in using a Globus confidential client, register a reconstruction function and flow, and run the flow using [`orchestration/flows/bl832/alcf.py`](orchestration/flows/bl832/alcf.py).
+
+## Index
+- [Details](#details)
+	- [Data flow diagram](#data-flow-diagram)
+	- [File flow details](#file-flow-details) 
+	- [Globus Compute Flow](#globus-compute-flow)
+	- [Reconstruction](#reconstruction)
+	- [Zarr Generation](#zarr-generation)
+	- [Pruning](#pruning) 
+- [Set up](#set-up) 
+	- [Requirements](#requirements) 
+	- [On Polaris](#on-polaris) 
+	- [In your local environment](#in-your-local-environment) 
+	- [Register Globus Compute Functions and Flows](#register-globus-compute-functions-and-flows)
+	- [Schedule Pruning with Prefect Workers](#schedule-pruning-with-prefect-workers)
+- [Helper Scripts](#helper-scripts)
+- [Performance](#performance)
 
 # Details
 ## Data flow diagram
@@ -25,13 +42,13 @@ init: {
 }%%
 graph TD
     A[Beamline 8.3.2] -->|Collect Data| B[spot832]
-    B -->|Transfer to NERSC| C[ /global/cfs/cdirs/als/data_mover/8.3.2/raw/< experiment folder name convention>/< h5 files>]
-    C -->|Start This Prefect Flow| D[ python -m orchestration.flows.bl832.alcf ]
-    D -->|Step 1: Transfer from NERSC to ALCF| E[ /eagle/IRIBeta/als/bl832/raw/< experiment folder name convention>/< h5 files>]
-    E -->|Step 2: Tomography Reconstruction Globus Flow| F[ run reconstruction.py and tiff_to_zarr.py on ALCF globus-compute-endpoint]
+    B -->|Transfer to data832| C[ /data/raw/< experiment folder name convention>/< h5 files>]
+    C -->|Start This Prefect Flow| D[ python orchestration/flows/bl832/alcf.py ]
+    D -->|Step 1: Transfer from data832 to ALCF| E[ /eagle/IRIBeta/als/bl832/raw/< experiment folder name convention>/< h5 files>]
+    E -->|Step 2: Run Globus Flows on ALCF Globus Compute Endpoint| F[ A: Run reconstruction.py <br> B: Run tiff_to_zarr.py]
     F -->|Save Reconstruction on ALCF| G[ /eagle/IRIBeta/als/bl832/scratch/< experiment folder name convention>/rec< dataset>/< tiffs> <br> /eagle/IRIBeta/als/bl832/scratch/< experiment folder name convention>/rec< dataset>.zarr/ ]
-    G -->|Step 3: Transfer back to NERSC| J[ /global/cfs/cdirs/als/data_mover/8.3.2/scratch/< experiment folder name convention>/rec< dataset>/< tiffs> <br> /global/cfs/cdirs/als/data_mover/8.3.2/scratch/< experiment folder name convention>/rec< dataset>.zarr/ ]
-    J -->|Schedule Pruning| L[Prune raw and scratch data from ALCF and NERSC]
+    G -->|Step 3: Transfer back to data832| J[ /data/scratch/globus_share/< experiment folder name convention>/rec< dataset>/< tiffs> <br> /data/scratch/globus_share/< experiment folder name convention>/rec< dataset>.zarr/ ]
+    J -->|Schedule Pruning| L[Prune raw and scratch data from ALCF and data832]
     J --> M[Visualize Results] 
     J -->|SciCat| N[TODO: ingest metadata into SciCat]
     M -->|2D Image Slices| O[view .tiff images ]
@@ -59,21 +76,23 @@ graph TD
 -   h5 files for tiled scans:
 	- `< YYYYMMDD>_< HHMMSS>_< user defined string>_x<##>y<##>.h5`
 
-**NERSC Raw Location**
--  `/global/cfs/cdirs/als/data_mover/8.3.2/raw/< Experiment folder name convention>/< h5 files>`
+**data832 Raw Location**
+- `data/raw/< Experiment folder name convention>/< h5 files>`
 
-**ALCF Raw Destination**
+**data832 Scratch Location**
+- `data/scratch/globus_share/< Experiment folder name convention>/rec< dataset>/< tiffs>`
+- `data/scratch/globus_share/< Experiment folder name convention>/rec< dataset>.zarr/`
+
+**ALCF Raw Location**
 - `/eagle/IRIBeta/als/bl832/raw/< Experiment folder name convention>/< h5 files>`
 
-**ALCF Recon Destination**
+**ALCF Scratch Location**
 - `/eagle/IRIBeta/als/bl832/scratch/< Experiment folder name convention>/rec< dataset>/< tiffs>`
-
-**NERSC Destination**
--  `/global/cfs/cdirs/als/data_mover/8.3.2/scratch/< Experiment folder name convention>/rec< dataset>/< tiffs>`
+- `/eagle/IRIBeta/als/bl832/scratch/< Experiment folder name convention>/rec< dataset>.zarr/`
 
 ## Globus Compute Flow
 
-The preferred method for scheduling jobs on ALCF is through Globus Compute. This `reconstruction_wrapper()` function contains the code registered with Globus, which runs the reconstruction on ALCF. The commands call two Python programs located in the IRIBeta project folder on Polaris.
+The preferred method for scheduling jobs on ALCF is through Globus Compute. This `reconstruction_wrapper()` function contains the code registered with Globus, which runs the reconstruction on ALCF. The commands call two Python programs located in the IRIBeta project folder on Polaris. Here is an example of code that is registered and run in the Globus Compute Flow:
 ```python
 def  reconstruction_wrapper(rundir,  h5_file_name,  folder_path):
 	...
@@ -106,14 +125,10 @@ After reconstruction is complete and data has moved back to NERSC/ALS, Prefect f
 
 - **ALCF** 
 	- Purge `raw` and `scratch` after 2 days
-- **NERSC**
-	- Purge `scratch` after 7 days
 - **data832**
-	- TODO:
-		- Add ALS Destination (data832)
-		- `/data/scratch/globus_share/< folder name convention>/rec< dataset>/< tiffs>`
-		- `/data/scratch/globus_share/< folder name convention>/rec< dataset>.zarr/`
-		- Purge `scratch` after 3 days
+	- `/data/scratch/globus_share/< folder name convention>/rec< dataset>/< tiffs>`
+	- `/data/scratch/globus_share/< folder name convention>/rec< dataset>.zarr/`
+	- Purge `scratch` after 3 days
 
 # Set up
 
@@ -149,15 +164,36 @@ GLOBUS_COMPUTE_ENDPOINT="< globus-compute-endpoint ID from step 6 >"
 GLOBUS_RECONSTRUCTION_FUNC="< Reconstruction function id from step 8 >"
 GLOBUS_FLOW_ID="< Flow ID from step 9 >"
 GLOBUS_IRIBETA_CGS_ENDPOINT="< IRIBeta_als guest collection UUID on Globus >"
+PREFECT_API_KEY="< your key for your Prefect server's API >"
+PREFECT_API_URL="< url to your Prefect server's API >"
 ```
+
+### Prefect Secret Blocks
+In addition to storing UUIDs in a `.env` file, we utilize Prefect's Secret Blocks. These can be configured in Prefect's user interface. The `.env` is great for managing secrets locally, but the Secret Blocks are handy for deployment and maintainability.
+
+1. Navigate to your Prefect server instance. In production at 8.3.2 (flow-prd.als.lbl.gov). Prefect cloud (https://app.prefect.cloud/), or local server (http://127.0.0.1:4200).
+2. On the left column, navigate to "Configuration --> Blocks"
+3. In the "Blocks" Window, hit the "+" plus sign next to the word "Blocks"
+4. Search for "Secret" and create a "Secret Block"
+5. Create the following secrets, and set their values to the corresponding UUID string:
+	```- globus-client-id
+	- globus-client-secret
+	- globus-compute-endpoint
+	- globus-reconstruction-function
+	- globus-reconstruction-flow-id
+	- globus-tiff-to-zarr-function
+	- globus-tiff-to-zarr-flow-id
+	- globus-iribeta-cgs-endpoint
+	```
 
 ## On Polaris:
 1. **SSH into Polaris**
 	
 	Login to Polaris using the following terminal command:
 	
-		ssh <your ALCF username>@polaris.alcf.anl.gov
-
+	```bash
+	ssh <your ALCF username>@polaris.alcf.anl.gov
+	```
 	Password: copy passcode from MobilePASS+
 
 2. **Copy and Update endpoint template_config.yaml file**
@@ -174,7 +210,7 @@ GLOBUS_IRIBETA_CGS_ENDPOINT="< IRIBeta_als guest collection UUID on Globus >"
 	**Note:** template_config.yaml needs to be updated to account for the new version of globus-compute-endpoint:
   
 	What you need to change is that you should replace this:  
-	```
+	```yaml
 	strategy:
 	    max_idletime: 300
 	    type: SimpleStrategy
@@ -182,7 +218,7 @@ GLOBUS_IRIBETA_CGS_ENDPOINT="< IRIBeta_als guest collection UUID on Globus >"
 	```
 	with this:  
 	
-	```
+	```yaml
 	strategy: simple
 	job_status_kwargs:
 	    max_idletime: 300
@@ -203,15 +239,16 @@ GLOBUS_IRIBETA_CGS_ENDPOINT="< IRIBeta_als guest collection UUID on Globus >"
 	- Generate a secret
 	- Store the confidential client UUID and Secret (note: make sure you copy the Client UUID and **not** the Secret UUID)
 
-	**Note:** If you create a new service client, you will need to get permissions set by the correct person at ALCF and NERSC to be able to use it for transfer endpoints.
+	**Note:** If you create a new service client, you will need to get permissions set by the correct person at ALCF, NERSC or other facility to be able to use it for transfer endpoints.
 	
 4. **Log into globus-compute-endpoint on Polaris with the service confidential client**
 
 	In your terminal on Polaris, set the following global variables with the Globus Confidential Client UUID and Secret respectively. Check the documentation here for more information (https://globus-compute.readthedocs.io/en/stable/sdk.html#client-credentials-with-clients). Globus-compute-endpoint will then log in using these credentials automatically:
-
-		export GLOBUS_COMPUTE_CLIENT_ID="<UUID>"
-		export GLOBUS_COMPUTE_CLIENT_SECRET="<SECRET>"
-	
+		
+	```bash
+	export GLOBUS_COMPUTE_CLIENT_ID="<UUID>"
+	export GLOBUS_COMPUTE_CLIENT_SECRET="<SECRET>"
+	```
 	**Note**: you can make sure you are signed into the correct account by entering:
 
 		globus-compute-endpoint whoami
@@ -250,13 +287,17 @@ GLOBUS_IRIBETA_CGS_ENDPOINT="< IRIBeta_als guest collection UUID on Globus >"
 	Now you can call this script using `source activate_tomopy.sh` in your home directory on Polaris to activate the environment in a single line of code. Be aware that this will not configure or start any globus-compute-endpoints.
 6. **Store endpoint uuid in .env file**
 
-	Store the Endpoint UUID in your `.env` file, which is given by running `globus-compute-endpoint list`. This will be used for running the Flow.
+	Store the Endpoint UUID in your `.env` file, which is given by running: 
+	```bash
+	globus-compute-endpoint list
+	```
+	This will be used for running the Flow.
 
 ## In your local environment:
 
  7. **Create a new conda environment called `globus_env`, or install Python dependencies directly (install.txt)**
 
-	The only requirement is a local environment, such as a Conda environment, that has Python 3.11 installed along with the Globus packages `globus_compute_sdk` and `globus_cli`. If you have a local installation of Conda you can set up an environment that can run the `Tomopy_for_ALS.ipynb` notebook and `ALCF_tomopy_reconstruction.py` with these steps in your terminal:
+	The only requirement is a local environment, such as a Conda environment, that has Python 3.11 installed along with the Globus packages `globus_compute_sdk` and `globus_cli`. If you have a local installation of Conda you can set up an environment that can run the [`scripts/Tomopy_for_ALS.ipynb`](scripts/Tomopy_for_ALS.ipynb) notebook and [`orchestration/flows/bl832/alcf.py`](orchestration/flows/bl832/alcf.py) with these steps in your terminal:
 
 	```bash
 	conda  create  -n  globus_env  python==3.11
@@ -264,51 +305,69 @@ GLOBUS_IRIBETA_CGS_ENDPOINT="< IRIBeta_als guest collection UUID on Globus >"
 	pip  install  globus_compute_sdk  globus_cli  python-dotenv
 	```
 
-	Note that the tomopy environment on Polaris contains Python 3.11. It is therefore necessary for this environment on your local machine to have a Python version close to this version.
-
-8. **Generate `GLOBUS_RECONSTRUCTION_FUNC` (store in `.env`)**
-
-	Follow the `Tomopy_for_ALS.ipynb` notebook until you get to the "Register Function" cell:
-
-	```python
-    reconstruction_func = gc.register_function(reconstruction_wrapper)
-    print(reconstruction_func)
-    ```
-	Save the UUID that is printed out in your `.env` file.
+	Note that the tomopy environment on Polaris contains Python 3.11. Therefore your local environment must have a Python version close to this version.
 	
-		GLOBUS_RECONSTRUCTION_FUNC="< UUID >"
-
-9. **Generate `GLOBUS_FLOW_ID` (store in `.env`)**
-
-	Continue following `Tomopy_for_ALS.ipynb` until you get to the cell before "Run the Flow":
-	```python
-	flow = fc.create_flow(definition=flow_definition,  title="Reconstruction flow",  input_schema={})
-	flow_id = flow['id']
-	print(flow)
-	flow_scope = flow['globus_auth_scope']
-	print(f'Newly created flow with id:\n{flow_id}\nand scope:\n{flow_scope}')
-	```
-	Save the flow_id in your `.env` file.
-
-
- 10. **Prefect server**
-
+ 8. **Prefect server**
 		Make sure you have Prefect setup. If you want to connect to a particular Prefect server that is already running, then in your local terminal set `PREFECT_API_URL` to your desired server address:
+			
+	```bash
+	prefect  config  set  PREFECT_API_URL="http://your-prefect-server/"
+	export PREFECT_API_KEY="your-prefect-key"
+	```
+	Otherwise, you can start a local server by running:
+				
+	```bash
+	prefect server start
+	```
 
-			prefect  config  set  PREFECT_API_URL="http://your-prefect-server/"
+### Register Globus Compute Functions and Flows
 
-		Otherwise, you can start a local server by running:
+We will now register two different Globus Compute Flows:
+- Reconstruction using [`scripts/init_reconstruction_globus_flow.py`](scripts/init_reconstruction_globus_flow.py)
+- Tiff to Zarr using [`scripts/init_tiff_to_zarr_globus_flow.py`](scripts/init_tiff_to_zarr_globus_flow.py)
+
+Registering the flows separately helps us maintain and monitor different steps in the pipeline more granularly. For each Globus Flow, we will store a `Flow ID` and a `Function ID`.
+
+9. **Register Reconstruction Globus Compute Flow**
+		Run the following command:
+	```bash
+	python scripts/init_reconstruction_globus_flow.py
+	```
+	
+	```python
+	GLOBUS_RECONSTRUCTION_FUNCTION="< UUID >"
+	GLOBUS_RECONSTRUCTION_FLOW_ID="< UUID >"
+	```
+	
+	Store the Flow and Function IDs in your `.env` file.
+	
+10. **Register Tiff  to Zarr Globus Compute Flow**
+		Run the following command:
+	```bash
+	python scripts/init_tiff_to_zarr_globus_flow.py
+	```
+	
+	Store the Flow and Function IDs in your `.env` file.
+	```python
+	GLOBUS_TIFF_TO_ZARR_FUNCTION="< UUID >"
+	GLOBUS_TIFF_TO_ZARR_FLOW_ID="< UUID >"
+	```
+	
+11. **Copy `.env` variables into Prefect Secret Blocks**
+	
+	While it is nice to keep track of these UUIDs locally in the `.env` file, we use Prefect Secret Blocks to store these values and access them in our code. Refer to the [setup instructions](#prefect-secret-blocks) setup section above for more information.
+ 
+ 12. **Run the script from the terminal:**
 		
-			prefect server start
-
- 11. **Run the script from the terminal:**
-		
-			python -m orchestration.flows.bl832.alcf
-
-		Monitor the logs in the terminal, which will update you on the current status.
-		Step 1: Transfer data from NERSC to ALCF
-		Step 2: Run the reconstruction Globus Flow, save to ALCF
-		Step 3: Transfer reconstruction to NERSC
+		```bash
+		python orchestration/flows/bl832/alcf.py
+		```
+		Monitor the logs in the terminal or the Prefect UI, which will update you on the current status.
+		- Step 1: Transfer data from data832 to ALCF
+		- Step 2: Schedule Globus Compute Flows on ALCF
+			- A: Run `reconstruction.py`
+			- B: Run `tiff_to_zarr.py`
+		- Step 3: Transfer reconstruction to data832
 
 		Errors at step 1 or 3?
 		- It may be authentication issues with your transfer client. Did you set `GLOBUS_CLIENT_ID` and `GLOBUS_CLIENT_SECRET` in `.env`?
@@ -327,17 +386,20 @@ GLOBUS_IRIBETA_CGS_ENDPOINT="< IRIBeta_als guest collection UUID on Globus >"
 			 
 		- It may be authentication issues with your confidential client. Did you set the environment variables in your terminal on Polaris?
 
-				export GLOBUS_COMPUTE_CLIENT_ID="<UUID>"
-				export GLOBUS_COMPUTE_CLIENT_SECRET="<SECRET>"
+			```bash
+			export GLOBUS_COMPUTE_CLIENT_ID="your-client-id"
+			export GLOBUS_COMPUTE_CLIENT_SECRET="your-client-secret"
+			```
 			
 			You can also check if you are logged into the confidential client:
-			
-				globus-compute-endpoint whoami
-12. **Check if the flow completed successfully**
+			```bash
+			globus-compute-endpoint whoami
+			```
+13. **Check if the flow completed successfully**
 
-	If the data successfully transferred back to NERSC, you will find it in the following location:
+	If the data successfully transferred back to data832, you will find it in the following location:
 		
-		/global/cfs/cdirs/als/data_mover/8.3.2/scratch/< folder name convention>/rec< dataset>/< tiffs>
+		/data/scratch/globus_share/< folder name convention>/rec< dataset>/< tiffs>
 
 
 
@@ -354,7 +416,7 @@ Following the previous steps to set up the Polaris and local environments enable
 
 ### Pruning Example
 
-This is an example of a pruning flow found in `orchestration/flows/bl832/prune.py`:
+This is an example of a pruning flow found in [`orchestration/flows/bl832/prune.py`](orchestration/flows/bl832/prune.py):
 
 ```python
 @flow(name="prune_alcf832_raw")
@@ -378,13 +440,15 @@ def  prune_alcf832_raw(relative_path:  str):
 
 To schedule and execute this flow from `alcf.py`, run this shell script in your terminal:
 
-	./create_deployments_832_alcf.sh
+```bash
+./create_deployments_832_alcf.sh
+```
 
 This script builds Prefect deployments for the different applicable prune functions in  `prune.py`, for example:
 	
 ```bash
 # create_deployments_832_alcf.sh
-prefect  deployment  build  ./orchestration/flows/bl832/prune.py:prune_alcf832_raw  -n  prune_alcf832_raw  -q  bl832  -p  test_pool
+prefect  deployment  build  ./orchestration/flows/bl832/prune.py:prune_alcf832_raw  -n  prune_alcf832_raw  -q  bl832  -p  alcf_prune_pool
 prefect  deployment  apply  prune_alcf832_raw-deployment.yaml
 ``` 
 
@@ -402,10 +466,9 @@ secret_block.get()
 ### Start a worker
 
 In a new terminal window, you can start a new worker by executing the following command:
-
-	prefect worker start -p test_pool -q bl832
-
-TODO: describe how to do this in production
+```bash
+prefect worker start -p alcf_prune_pool -q bl832
+```
 
 ### Prefect Blocks
 
@@ -422,6 +485,45 @@ In the Prefect UI, navigate to the left column under "Configuration" and select 
 ```
 Read more about Blocks here: https://docs.prefect.io/latest/concepts/blocks/
 
+
+# Helper Scripts
+We also provide several scripts for registering a new Globus Compute Flow, checking that the Globus Compute Endpoint is available, and ensuring that Globus Transfer has the correct permissions for reading, writing, and deleting data at a given transfer endpoint.
+
+### Check Globus Compute Status [`orchestration/scripts/check_globus_compute.py`](orchestration/scripts/check_globus_compute.py) 
+
+Example usage (from the command line):
+
+```bash
+python check_globus_compute.py --endpoint_id "your-uuid-here"
+```
+
+IMPORTANT. Ensure you are logged into Globus Compute in your local environment:
+```bash
+export GLOBUS_COMPUTE_CLIENT_ID="your-client-id"
+export GLOBUS_COMPUTE_CLIENT_SECRET="your-client-secret"
+```
+### Check Globus Transfer [`orchestration/scripts/check_globus_transfer.py`](orchestration/scripts/check_globus_transfer.py)
+
+Run from the command line:
+
+```bash
+python check_globus_transfer.py --endpoint_id "your-endpoint-id"
+```
+
+IMPORTANT. Ensure you are logged into Globus Transfer in your local environment:
+	
+```bash
+export GLOBUS_CLIENT_ID="your-client-id"
+export GLOBUS_CLIENT_SECRET="your-client-secret"
+```
+
+### Login to Globus and Prefect [`orchestration/scripts/login_to_globus_and_prefect.sh`](orchestration/scripts/login_to_globus_and_prefect.sh)
+Run this script to log into Globus Transfer, Globus Compute, and Prefect simultaneously (assuming you already filled your `.env` file with the correct login information). This can speed up logging in for your sessions.
+
+Example usage:
+```bash
+source ./login_to_globus_and_prefect.sh
+```
 
 # Performance
 
@@ -440,4 +542,3 @@ Trial 2
 |**Globus Flow**. |Full tomographic reconstruction and Zarr conversion   |9.09|N/A  |
 |**ALCF to NERSC**|Transfer of reconstructed data (tiffs + Zarr) to NERSC|0.90|55.29|
 
-TODO: Investigate discrepancy in performance speed

@@ -97,7 +97,7 @@ def list_directory(transfer_client: globus_sdk.TransferClient, endpoint_id: str,
 def create_directory(transfer_client: globus_sdk.TransferClient,
                      endpoint_id: str,
                      base_path: str = "",
-                     directory_name: str = "test/") -> bool:
+                     directory_name: str = "test_directory/") -> bool:
     """
     Create a directory on a specified Globus endpoint.
 
@@ -136,7 +136,7 @@ def create_directory(transfer_client: globus_sdk.TransferClient,
 
 
 @task
-def remove_directory(transfer_client: globus_sdk.TransferClient, endpoint_id: str, path: str = "test/") -> bool:
+def remove_directory(transfer_client: globus_sdk.TransferClient, endpoint_id: str, path: str) -> bool:
     """
     Remove a directory on a specified Globus endpoint.
 
@@ -157,6 +157,7 @@ def remove_directory(transfer_client: globus_sdk.TransferClient, endpoint_id: st
         transfer_result = transfer_client.submit_delete(delete_data)
         logger.info(f"Successfully submitted request to remove directory {path} in endpoint {endpoint_id}.")
         logger.info(f"Task ID: {transfer_result['task_id']}")
+        logger.info(f"transfer result:  {transfer_result}")
         success = True
     except globus_sdk.GlobusAPIError as err:
         logger.error(f"Error removing directory {path} in endpoint {endpoint_id}: {err.message}")
@@ -171,17 +172,19 @@ def check_globus_transfer_permissions(endpoint_id: str,
                                       transfer_client: Optional[globus_sdk.TransferClient],
                                       list_contents: bool = True,
                                       create_test_directory: bool = True,
-                                      delete_test_directory: bool = True) -> None:
+                                      delete_test_directory: bool = True,
+                                      directory_name: str = "test_directory/") -> None:
     """
-    Check permissions, list directory contents, create a test directory,
+    Check permissions, list directory contents, create a directory,
     and remove a directory on a Globus endpoint.
 
     Args:
         endpoint_id (str): The UUID of the endpoint to check.
         transfer_client (Optional[globus_sdk.TransferClient]): An authenticated TransferClient object or None.
         list_contents (bool, optional): Whether to list directory contents. Default is True.
-        create_test_directory (bool, optional): Whether to create a test directory. Default is True.
-        delete_test_directory (bool, optional): Whether to delete the test directory. Default is True.
+        create_test_directory (bool, optional): Whether to create a directory. Default is True.
+        delete_test_directory (bool, optional): Whether to delete the directory. Default is True.
+        directory_name (str, optional): The name of the directory to create/delete. Default is "test_directory/".
     """
     logger = get_run_logger()
     if transfer_client is None:
@@ -199,18 +202,17 @@ def check_globus_transfer_permissions(endpoint_id: str,
         logger.info(f"list_directory successful: {success_list_directory}")
 
     if create_test_directory:
-        new_directory_name = "test/"
-        success_create_directory = create_directory(transfer_client, endpoint_id, "", new_directory_name)
+        success_create_directory = create_directory(transfer_client, endpoint_id, "", directory_name)
         logger.info(f"create_directory successful: {success_create_directory}")
 
     if delete_test_directory:
-        success_remove_directory = remove_directory(transfer_client, endpoint_id, "test/")
+        success_remove_directory = remove_directory(transfer_client, endpoint_id, directory_name)
         logger.info(f"remove_directory successful: {success_remove_directory}")
 
     if list_contents and create_test_directory:
-        logger.info(f"Listing / directory after creating {new_directory_name}:")
-        success_list_directory_after = list_directory(transfer_client, endpoint_id, new_directory_name)
-        logger.info(f"list_directory (after creating test directory) successful: {success_list_directory_after}")
+        logger.info(f"Listing / directory after creating {directory_name}:")
+        success_list_directory_after = list_directory(transfer_client, endpoint_id, directory_name)
+        logger.info(f"list_directory (after creating {directory_name}) successful: {success_list_directory_after}")
 
 
 def main() -> None:
@@ -218,21 +220,24 @@ def main() -> None:
     Main function to parse command-line arguments and run the check_globus_transfer_permissions flow.
 
     Run from the command line:
-    python check_globus_transfer.py --endpoint_id "your-endpoint-id"
+    python check_globus_transfer.py --endpoint_id "your-endpoint-id" --directory_name "your-directory-name"
 
     Command-line arguments:
         --endpoint_id (str): The UUID of the endpoint to operate on.
         --list_contents (bool): Whether to list directory contents. Default is True.
-        --create_test_directory (bool): Whether to create a test directory. Default is True.
-        --delete_test_directory (bool): Whether to delete the test directory. Default is True.
+        --create_test_directory (bool): Whether to create a directory. Default is True.
+        --delete_test_directory (bool): Whether to delete the directory. Default is True.
+        --directory_name (str): The name of the directory to create or delete. Default is "test_directory".
     """
     parser = argparse.ArgumentParser(description="Run Globus transfer operations on a specified endpoint.")
     parser.add_argument('--endpoint_id', type=str, required=True, help="The UUID of the Globus endpoint.")
     parser.add_argument('--list_contents', type=bool, default=True, help="Whether to list directory contents.")
     parser.add_argument('--create_test_directory', type=bool, default=True,
-                        help="Whether to create a test directory.")
+                        help="Whether to create a directory.")
     parser.add_argument('--delete_test_directory', type=bool, default=True,
-                        help="Whether to delete the test directory.")
+                        help="Whether to delete the directory.")
+    parser.add_argument('--directory_name', type=str, default="test_directory/",
+                        help="The name of the directory to create or delete.")
 
     args = parser.parse_args()
 
@@ -241,7 +246,8 @@ def main() -> None:
         transfer_client=None,
         list_contents=args.list_contents,
         create_test_directory=args.create_test_directory,
-        delete_test_directory=args.delete_test_directory
+        delete_test_directory=args.delete_test_directory,
+        directory_name=args.directory_name
     )
 
 

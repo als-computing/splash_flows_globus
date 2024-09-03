@@ -109,6 +109,8 @@ class MockConfig832():
         self.endpoints = {
             "spot832": MockEndpoint(root_path="mock_spot832_path", uuid_value=str(uuid4())),
             "data832": MockEndpoint(root_path="mock_data832_path", uuid_value=str(uuid4())),
+            "data832_raw": MockEndpoint(root_path="mock_data832_raw_path", uuid_value=str(uuid4())),
+            "data832_scratch": MockEndpoint(root_path="mock_data832_scratch_path", uuid_value=str(uuid4())),
             "nersc832": MockEndpoint(root_path="mock_nersc832_path", uuid_value=str(uuid4())),
             "nersc_test": MockEndpoint(root_path="mock_nersc_test_path", uuid_value=str(uuid4())),
             "nersc_alsdev": MockEndpoint(root_path="mock_nersc_alsdev_path", uuid_value=str(uuid4())),
@@ -136,6 +138,9 @@ class MockConfig832():
         self.alcf832_raw = self.endpoints["alcf832_raw"]
         self.alcf832_scratch = self.endpoints["alcf832_scratch"]
         self.nersc832_alsdev_scratch = self.endpoints["nersc832_alsdev_scratch"]
+        self.data832 = self.endpoints["data832"]
+        self.data832_raw = self.endpoints["data832_raw"]
+        self.data832_scratch = self.endpoints["data832_scratch"]
         self.scicat = config["scicat"]
 
 
@@ -205,7 +210,7 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_secret.value = str(uuid4())
     # https://pytest-mock.readthedocs.io/en/latest/usage.html#usage-as-context-manager
     with mocker.patch('prefect.blocks.system.Secret.load', return_value=mock_secret):
-        from orchestration.scripts.alcf import process_new_832_ALCF_flow
+        from orchestration.flows.bl832.alcf import process_new_832_ALCF_flow
 
     """Test for the process of a new 832 ALCF flow"""
     folder_name = "test_folder"
@@ -214,18 +219,22 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     # Mock the Config832 class inserting into the module being tested
     mock_config = MockConfig832()
 
-    mock_transfer_to_alcf = mocker.patch('orchestration.scripts.alcf.transfer_data_to_alcf',
+    mock_transfer_to_alcf = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_alcf',
                                          return_value=True)
-    mock_reconstruction_flow = mocker.patch('orchestration.scripts.alcf.alcf_tomopy_reconstruction_flow',
+    mock_reconstruction_flow = mocker.patch('orchestration.flows.bl832.alcf.alcf_tomopy_reconstruction_flow',
                                             return_value=True)
-    mock_transfer_to_nersc = mocker.patch('orchestration.scripts.alcf.transfer_data_to_nersc',
+    mock_alcf_tiff_to_zarr_flow = mocker.patch('orchestration.flows.bl832.alcf.alcf_tiff_to_zarr_flow',
+                                               return_value=True)
+    mock_transfer_to_data832 = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_data832',
+                                            return_value=True)
+    mock_transfer_to_nersc = mocker.patch('orchestration.flows.bl832.alcf.transfer_data_to_nersc',
                                           return_value=True)
-    mock_schedule_pruning = mocker.patch('orchestration.scripts.alcf.schedule_pruning',
+    mock_schedule_pruning = mocker.patch('orchestration.flows.bl832.alcf.schedule_pruning',
                                          return_value=True)
 
-    alcf_raw_path = f"{folder_name}/{file_name}.h5" if True else None
-    scratch_path_tiff = f"{folder_name}/rec{file_name}/" if True else None
-    scratch_path_zarr = f"{folder_name}/rec{file_name}.zarr/" if True else None
+    alcf_raw_path = f"{folder_name}/{file_name}.h5"
+    scratch_path_tiff = f"{folder_name}/rec{file_name}/"
+    scratch_path_zarr = f"{folder_name}/rec{file_name}.zarr/"
 
     # Assert the expected results
     # Case 1: Send to ALCF is True and is_export_control is False
@@ -236,32 +245,39 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
 
     mock_transfer_to_alcf.assert_called_once_with(f"{folder_name}/{file_name}.h5",
                                                   mock_config.tc,
-                                                  mock_config.nersc_test,
+                                                  mock_config.data832_raw,
                                                   mock_config.alcf832_raw)
 
-    mock_reconstruction_flow.assert_called_once_with(raw_path=f"bl832_test/raw/{folder_name}",
-                                                     scratch_path=f"bl832_test/scratch/{folder_name}",
+    mock_reconstruction_flow.assert_called_once_with(raw_path=f"bl832/raw/{folder_name}",
+                                                     scratch_path=f"bl832/scratch/{folder_name}",
                                                      folder_name=folder_name, file_name=f"{file_name}.h5")
 
-    mock_transfer_to_nersc.assert_has_calls([
+    mock_alcf_tiff_to_zarr_flow.assert_called_once_with(raw_path=f"bl832/raw/{folder_name}",
+                                                        scratch_path=f"bl832/scratch/{folder_name}",
+                                                        folder_name=folder_name, file_name=f"{file_name}.h5")
+    mock_transfer_to_data832.assert_has_calls([
         mocker.call(scratch_path_tiff,
-                    mock_config.tc, mock_config.alcf832_scratch, mock_config.nersc832_alsdev_scratch),
+                    mock_config.tc, mock_config.alcf832_scratch, mock_config.data832_scratch),
         mocker.call(scratch_path_zarr,
-                    mock_config.tc, mock_config.alcf832_scratch, mock_config.nersc832_alsdev_scratch)
+                    mock_config.tc, mock_config.alcf832_scratch, mock_config.data832_scratch)
     ])
 
     mock_schedule_pruning.assert_called_once_with(
         alcf_raw_path=alcf_raw_path,
         alcf_scratch_path_tiff=scratch_path_tiff,
         alcf_scratch_path_zarr=scratch_path_zarr,
-        nersc_scratch_path_tiff=scratch_path_tiff,
-        nersc_scratch_path_zarr=scratch_path_zarr,
+        nersc_scratch_path_tiff=None,
+        nersc_scratch_path_zarr=None,
+        data832_scratch_path_tiff=f"scratch/{scratch_path_tiff}",
+        data832_scratch_path_zarr=f"scratch/{scratch_path_zarr}",
         one_minute=True
     )
     assert isinstance(result, list), "Result should be a list"
-    assert result == [True, True, True], "Result does not match expected values"
+    assert result == [True, True, True, True], "Result does not match expected values"
     mock_transfer_to_alcf.reset_mock()
     mock_reconstruction_flow.reset_mock()
+    mock_alcf_tiff_to_zarr_flow.reset_mock()
+    mock_transfer_to_data832.reset_mock()
     mock_transfer_to_nersc.reset_mock()
     mock_schedule_pruning.reset_mock()
 
@@ -272,13 +288,17 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf, config=mock_config)
     mock_transfer_to_alcf.assert_not_called()
     mock_reconstruction_flow.assert_not_called()
+    mock_alcf_tiff_to_zarr_flow.assert_not_called()
+    mock_transfer_to_data832.assert_not_called()
     mock_transfer_to_nersc.assert_not_called()
     mock_schedule_pruning.assert_not_called()
     assert isinstance(result, list), "Result should be a list"
-    assert result == [False, False, False], "Result does not match expected values"
+    assert result == [False, False, False, False], "Result does not match expected values"
 
     mock_transfer_to_alcf.reset_mock()
     mock_reconstruction_flow.reset_mock()
+    mock_alcf_tiff_to_zarr_flow.reset_mock()
+    mock_transfer_to_data832.reset_mock()
     mock_transfer_to_nersc.reset_mock()
     mock_schedule_pruning.reset_mock()
 
@@ -289,13 +309,17 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf, config=mock_config)
     mock_transfer_to_alcf.assert_not_called()
     mock_reconstruction_flow.assert_not_called()
+    mock_alcf_tiff_to_zarr_flow.assert_not_called()
+    mock_transfer_to_data832.assert_not_called()
     mock_transfer_to_nersc.assert_not_called()
     mock_schedule_pruning.assert_not_called()
     assert isinstance(result, list), "Result should be a list"
-    assert result == [False, False, False], "Result does not match expected values"
+    assert result == [False, False, False, False], "Result does not match expected values"
 
     mock_transfer_to_alcf.reset_mock()
     mock_reconstruction_flow.reset_mock()
+    mock_alcf_tiff_to_zarr_flow.reset_mock()
+    mock_transfer_to_data832.reset_mock()
     mock_transfer_to_nersc.reset_mock()
     mock_schedule_pruning.reset_mock()
 
@@ -306,7 +330,9 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     result = process_new_832_ALCF_flow(folder_name, file_name, is_export_control, send_to_alcf, config=mock_config)
     mock_transfer_to_alcf.assert_not_called()
     mock_reconstruction_flow.assert_not_called()
+    mock_alcf_tiff_to_zarr_flow.assert_not_called()
+    mock_transfer_to_data832.assert_not_called()
     mock_transfer_to_nersc.assert_not_called()
     mock_schedule_pruning.assert_not_called()
     assert isinstance(result, list), "Result should be a list"
-    assert result == [False, False, False], "Result does not match expected values"
+    assert result == [False, False, False, False], "Result does not match expected values"

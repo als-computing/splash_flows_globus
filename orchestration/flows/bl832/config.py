@@ -11,6 +11,8 @@ class Config832:
         self.flow_client = flows.get_flows_client()
         self.spot832 = self.endpoints["spot832"]
         self.data832 = self.endpoints["data832"]
+        self.data832_raw = self.endpoints["data832_raw"]
+        self.data832_scratch = self.endpoints["data832_scratch"]
         self.nersc832 = self.endpoints["nersc832"]
         self.nersc_test = self.endpoints["nersc_test"]
         self.nersc_alsdev = self.endpoints["nersc_alsdev"]

@@ -61,7 +61,7 @@ def check_globus_compute_status(endpoint_id: str) -> bool:
 def main() -> None:
     """
     Main function to parse command-line arguments and check the Globus Compute endpoint status.
-    Example usage"
+    Example usage:
     python check_globus_compute.py --endpoint_id "your-uuid-here"
 
     IMPORTANT:

@@ -10,14 +10,26 @@ globus:
       uri: data832.lbl.gov
       uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
 
+    data832_raw:
+      root_path: /data/raw
+      uri: data832.lbl.gov
+      uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
+      name: data832_raw
+
+    data832_scratch:
+      root_path: /data/scratch/globus_share
+      uri: data832.lbl.gov
+      uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
+      name: data832_scratch
+
     alcf832_raw:
-      root_path: /bl832_test/raw
+      root_path: /bl832/raw
       uri: alcf.anl.gov
       uuid: 55c3adf6-31f1-4647-9a38-52591642f7e7
       name: alcf_raw
 
     alcf832_scratch:
-      root_path: /bl832_test/scratch
+      root_path: /bl832/scratch
       uri: alcf.anl.gov
       uuid: 55c3adf6-31f1-4647-9a38-52591642f7e7
       name: alcf_scratch
