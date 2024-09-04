@@ -83,7 +83,7 @@ def prune_alcf832_raw(relative_path: str):
         if_older_than_days=0,
         tranfer_client=config.tc,
         source_endpoint=config.alcf832_raw,
-        check_endpoint=config.nersc832_alsdev_raw,
+        check_endpoint=config.data832_raw,
         logger=p_logger,
         max_wait_seconds=max_wait_seconds,
     )
@@ -101,7 +101,7 @@ def prune_alcf832_scratch(relative_path: str):
         if_older_than_days=0,
         tranfer_client=config.tc,
         source_endpoint=config.alcf832_scratch,
-        check_endpoint=config.nersc832_alsdev_scratch,
+        check_endpoint=config.data832_scratch,
         logger=p_logger,
         max_wait_seconds=max_wait_seconds,
     )

@@ -268,12 +268,13 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
         alcf_scratch_path_zarr=scratch_path_zarr,
         nersc_scratch_path_tiff=None,
         nersc_scratch_path_zarr=None,
-        data832_scratch_path_tiff=f"scratch/{scratch_path_tiff}",
-        data832_scratch_path_zarr=f"scratch/{scratch_path_zarr}",
+        data832_raw_path=alcf_raw_path,
+        data832_scratch_path_tiff=f"{scratch_path_tiff}",
+        data832_scratch_path_zarr=f"{scratch_path_zarr}",
         one_minute=True
     )
     assert isinstance(result, list), "Result should be a list"
-    assert result == [True, True, True, True], "Result does not match expected values"
+    assert result == [True, True, True, True, True], "Result does not match expected values"
     mock_transfer_to_alcf.reset_mock()
     mock_reconstruction_flow.reset_mock()
     mock_alcf_tiff_to_zarr_flow.reset_mock()
@@ -293,7 +294,7 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_transfer_to_nersc.assert_not_called()
     mock_schedule_pruning.assert_not_called()
     assert isinstance(result, list), "Result should be a list"
-    assert result == [False, False, False, False], "Result does not match expected values"
+    assert result == [False, False, False, False, False], "Result does not match expected values"
 
     mock_transfer_to_alcf.reset_mock()
     mock_reconstruction_flow.reset_mock()
@@ -314,7 +315,7 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_transfer_to_nersc.assert_not_called()
     mock_schedule_pruning.assert_not_called()
     assert isinstance(result, list), "Result should be a list"
-    assert result == [False, False, False, False], "Result does not match expected values"
+    assert result == [False, False, False, False, False], "Result does not match expected values"
 
     mock_transfer_to_alcf.reset_mock()
     mock_reconstruction_flow.reset_mock()
@@ -335,4 +336,4 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_transfer_to_nersc.assert_not_called()
     mock_schedule_pruning.assert_not_called()
     assert isinstance(result, list), "Result should be a list"
-    assert result == [False, False, False, False], "Result does not match expected values"
+    assert result == [False, False, False, False, False], "Result does not match expected values"

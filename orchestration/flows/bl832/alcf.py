@@ -211,6 +211,7 @@ def schedule_pruning(
         alcf_scratch_path_zarr: str = None,
         nersc_scratch_path_tiff: str = None,
         nersc_scratch_path_zarr: str = None,
+        data832_raw_path: str = None,
         data832_scratch_path_tiff: str = None,
         data832_scratch_path_zarr: str = None,
         one_minute: bool = False) -> bool:
@@ -246,6 +247,7 @@ def schedule_pruning(
         (alcf_scratch_path_zarr, "alcf832_scratch", alcf_delay),
         (nersc_scratch_path_tiff, "nersc832_alsdev_scratch", nersc_delay),
         (nersc_scratch_path_zarr, "nersc832_alsdev_scratch", nersc_delay),
+        (data832_raw_path, "data832_raw", data832_delay),
         (data832_scratch_path_tiff, "data832_scratch", data832_delay),
         (data832_scratch_path_zarr, "data832_scratch", data832_delay)
     ]
@@ -582,41 +584,48 @@ def process_new_832_ALCF_flow(folder_name: str,
             logger.info("Tiff to Zarr Successful.")
 
         # Step 3: Send reconstructed data (tiffs and zarr) to data832
-        # Send reconstructed data (tiff) to data832
+        # Transfer A: Send reconstructed data (tiff) to data832
         logger.info(f"Transferring {file_name} from {alcf_raw_path} at ALCF to {data832_scratch_path} at data832")
         logger.info(f"Reconstructed file path: {scratch_path_tiff}")
-        data832_transfer_success = transfer_data_to_data832(scratch_path_tiff,
-                                                            config.tc,
-                                                            config.alcf832_scratch,
-                                                            config.data832_scratch)
-        if not data832_transfer_success:
+        data832_tiff_transfer_success = transfer_data_to_data832(scratch_path_tiff,
+                                                                 config.tc,
+                                                                 config.alcf832_scratch,
+                                                                 config.data832_scratch)
+        if not data832_tiff_transfer_success:
             logger.error("Transfer failed due to configuration or authorization issues.")
         else:
             logger.info("Transfer successful.")
 
-        # Send reconstructed data (zarr) to data832
+        # Transfer B: Send reconstructed data (zarr) to data832
         logger.info(f"Transferring {file_name} from {alcf_raw_path} at ALCF to {data832_scratch_path} at data832")
         logger.info(f"Reconstructed file path: {scratch_path_zarr}")
-        data832_transfer_success = transfer_data_to_data832(scratch_path_zarr,
-                                                            config.tc,
-                                                            config.alcf832_scratch,
-                                                            config.data832_scratch)
-        if not data832_transfer_success:
+        data832_zarr_transfer_success = transfer_data_to_data832(scratch_path_zarr,
+                                                                 config.tc,
+                                                                 config.alcf832_scratch,
+                                                                 config.data832_scratch)
+        if not data832_zarr_transfer_success:
             logger.error("Transfer failed due to configuration or authorization issues.")
         else:
             logger.info("Transfer successful.")
 
         # Step 4: Schedule deletion of files from ALCF, NERSC, and data832
         logger.info("Scheduling deletion of files from ALCF, NERSC, and data832")
+        # alcf_transfer_success = True
         nersc_transfer_success = False
+        # alcf_reconstruction_success = True
+        # alcf_tiff_to_zarr_success = True
+        # data832_tiff_transfer_success = True
+        # data832_zarr_transfer_success = True
+
         schedule_pruning(
             alcf_raw_path=f"{folder_name}/{h5_file_name}" if alcf_transfer_success else None,
             alcf_scratch_path_tiff=f"{scratch_path_tiff}" if alcf_reconstruction_success else None,
-            alcf_scratch_path_zarr=f"{scratch_path_zarr}" if alcf_reconstruction_success else None,
+            alcf_scratch_path_zarr=f"{scratch_path_zarr}" if alcf_tiff_to_zarr_success else None,
             nersc_scratch_path_tiff=f"{scratch_path_tiff}" if nersc_transfer_success else None,
             nersc_scratch_path_zarr=f"{scratch_path_zarr}" if nersc_transfer_success else None,
-            data832_scratch_path_tiff=f"scratch/{scratch_path_tiff}" if data832_transfer_success else None,
-            data832_scratch_path_zarr=f"scratch/{scratch_path_zarr}" if data832_transfer_success else None,
+            data832_raw_path=f"{folder_name}/{h5_file_name}" if alcf_transfer_success else None,
+            data832_scratch_path_tiff=f"{scratch_path_tiff}" if data832_tiff_transfer_success else None,
+            data832_scratch_path_zarr=f"{scratch_path_zarr}" if data832_zarr_transfer_success else None,
             one_minute=True  # Set to False for production durations
         )
 
@@ -627,17 +636,20 @@ def process_new_832_ALCF_flow(folder_name: str,
             f"alcf_reconstruction_success: {alcf_reconstruction_success}, "
             f"alcf_tiff_to_zarr_success: {alcf_tiff_to_zarr_success}, "
             # f"nersc_transfer_success: {nersc_transfer_success}"
-            f"data832_transfer_success: {data832_transfer_success}"
+            f"data832_tiff_transfer_success: {data832_tiff_transfer_success}, "
+            f"data832_zarr_transfer_success: {data832_zarr_transfer_success}"
+
         )
 
         return [alcf_transfer_success,
                 alcf_reconstruction_success,
                 alcf_tiff_to_zarr_success,
-                data832_transfer_success]
+                data832_tiff_transfer_success,
+                data832_zarr_transfer_success]
 
     else:
         logger.info("Export control is enabled or send_to_alcf is set to False. No action taken.")
-        return [False, False, False, False]
+        return [False, False, False, False, False]
 
 
 if __name__ == "__main__":
