@@ -19,45 +19,14 @@ TRANSFER_ACTION_PROVIDER_SCOPE_STRING = (
 
 dotenv_file = load_dotenv()
 
-# GLOBUS_CLIENT_ID = os.getenv("GLOBUS_CLIENT_ID")
-# GLOBUS_CLIENT_SECRET = os.getenv("GLOBUS_CLIENT_SECRET")
-
 GLOBUS_CLIENT_ID = Secret.load("globus-client-id")
 GLOBUS_CLIENT_SECRET = Secret.load("globus-client-secret")
 
 
-def do_login_flow(scopes, native_client):
-    native_client.oauth2_start_flow(requested_scopes=scopes,
-                                    refresh_tokens=True)
-    authorize_url = native_client.oauth2_get_authorize_url()
-    print(f"Please go to this URL and login:\n\n{authorize_url}\n")
-    auth_code = input("Please enter the code here: ").strip()
-    tokens = native_client.oauth2_exchange_code_for_tokens(auth_code)
-    return tokens
-
-
-def get_manage_flow_authorizer(client_id):
-    # native_client = globus_sdk.NativeAppAuthClient(client_id)
-    confidential_client = globus_sdk.ConfidentialAppAuthClient(
-        client_id=GLOBUS_CLIENT_ID.get(), client_secret=GLOBUS_CLIENT_SECRET.get()
-    )
-    # resource_server = globus_sdk.FlowsClient.resource_server
-    all_scopes = [
-        globus_sdk.FlowsClient.scopes.manage_flows,
-        globus_sdk.FlowsClient.scopes.run_status,
-    ]
-    return globus_sdk.ClientCredentialsAuthorizer(
-        confidential_client,
-        all_scopes)
-
-
 def get_flows_client():
-    # native_client = globus_sdk.NativeAppAuthClient(client_id)
     confidential_client = globus_sdk.ConfidentialAppAuthClient(
         client_id=GLOBUS_CLIENT_ID.get(), client_secret=GLOBUS_CLIENT_SECRET.get()
     )
-
-    # resource_server = globus_sdk.FlowsClient.resource_server
     all_scopes = [
         globus_sdk.FlowsClient.scopes.manage_flows,
         globus_sdk.FlowsClient.scopes.run_status,
@@ -83,7 +52,6 @@ def get_specific_flow_client(flow_id, collection_ids=None):
     flow_scopes = flow_scopes[2].make_mutable("user")
 
     flows_authorizer = ClientCredentialsAuthorizer(confidential_client, flow_scopes)
-    # could monkeypatch the init function for ClientCredentialsAuthorizer with my own function
     flow_client = SpecificFlowClient(flow_id, authorizer=flows_authorizer)
 
     # Request token for Transfer scopes

@@ -18,7 +18,7 @@ def get_polaris_endpoint_id() -> str:
     return compute_endpoint_id
 
 
-def reconstruction_wrapper(rundir, h5_file_name, folder_path):
+def conversion_wrapper(rundir, h5_file_name, folder_path):
     """
     Python function that wraps around the application call for Tomopy reconstruction on ALCF
 
@@ -85,7 +85,7 @@ def setup_tiff_to_zarr_flow() -> None:
     gce = Executor(endpoint_id=get_polaris_endpoint_id())
     print(gce)
 
-    reconstruction_func = gc.register_function(reconstruction_wrapper)
+    reconstruction_func = gc.register_function(conversion_wrapper)
 
     flows_client = get_flows_client()
     flow = flows_client.create_flow(definition=create_flow_definition(),

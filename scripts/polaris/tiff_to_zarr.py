@@ -60,7 +60,7 @@ def main():
     # The scale and axis units are the same as the one printed in the reconstruction script
     image.scale = {'z': 0.65, 'y': 0.65, 'x': 0.65}
     image.axes_units = {'z': 'micrometer', 'y': 'micrometer', 'x': 'micrometer'}
-    multiscales = to_multiscales(image, method=Methods.DASK_IMAGE_GAUSSIAN)
+    multiscales = to_multiscales(image, method=Methods.DASK_IMAGE_GAUSSIAN, cache=False)
     to_ngff_zarr(zarr_dir, multiscales)
     print('NGFF Zarr created')
 

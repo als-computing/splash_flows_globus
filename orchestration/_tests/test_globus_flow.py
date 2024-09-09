@@ -6,7 +6,7 @@ from globus_compute_sdk.sdk.client import Client
 
 from prefect.testing.utilities import prefect_test_harness
 from prefect.blocks.system import JSON, Secret
-from pydantic import BaseModel, ConfigDict, PydanticDeprecatedSince20
+from pydantic import BaseModel, PydanticDeprecatedSince20
 import pytest
 from pytest_mock import MockFixture
 
@@ -60,35 +60,6 @@ class FlowInputSchema(BaseModel):
     """Model for flow input schema"""
     type: str
     properties: Dict[str, Dict[str, Any]]
-
-
-class CreateFlowRequest(BaseModel):
-    """Model for creating a flow request"""
-    title: str
-    definition: FlowDefinition
-    input_schema: FlowInputSchema
-    subtitle: Optional[str] = None
-    description: Optional[str] = None
-    flow_viewers: Optional[List[str]] = None
-    flow_starters: Optional[List[str]] = None
-    flow_administrators: Optional[List[str]] = None
-    keywords: Optional[List[str]] = None
-    subscription_id: Optional[UUID] = None
-    additional_fields: Optional[Dict[str, Any]] = None
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-
-class RunFlowRequest(BaseModel):
-    """Model for running a flow request"""
-    body: Dict[str, Any]
-    label: Optional[str] = None
-    tags: Optional[List[str]] = None
-    run_monitors: Optional[List[str]] = None
-    run_managers: Optional[List[str]] = None
-    additional_fields: Optional[Dict[str, Any]] = None
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class MockEndpoint:
@@ -177,10 +148,24 @@ class MockFlowsClient:
     def __init__(self):
         self.flows = {}
 
-    def create_flow(self, request: CreateFlowRequest) -> Dict[str, Any]:
+    def create_flow(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Mock method for initializing a new flow with Globus Flows"""
         flow_id = UUID("123e4567-e89b-12d3-a456-426614174000")
-        self.flows[flow_id] = request.model_dump()
+        request = {
+            "title": str,
+            "definition": FlowDefinition,
+            "input_schema": FlowInputSchema,
+            "subtitle": Optional[str],
+            "description": Optional[str],
+            "flow_viewers": Optional[List[str]],
+            "flow_starters": Optional[List[str]],
+            "flow_administrators": Optional[List[str]],
+            "keywords": Optional[List[str]],
+            "subscription_id": Optional[UUID],
+            "additional_fields": Optional[Dict[str, Any]],
+            "model_config": {"arbitrary_types_allowed": True}
+        }
+        self.flows[flow_id] = request
         return {"flow_id": str(flow_id)}
 
     def get_flow(self, flow_id: UUID) -> Dict[str, Any]:
@@ -194,9 +179,18 @@ class MockSpecificFlowClient:
         self.flow_id = flow_id
         self.runs = {}
 
-    def run_flow(self, request: RunFlowRequest) -> Dict[str, Any]:
+    def run_flow(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Mock method for running a registered flow function"""
         run_id = UUID("123e4567-e89b-12d3-a456-426614174001")
+        request = {
+            "body": Dict[str, Any],
+            "label": Optional[str],
+            "tags": Optional[List[str]],
+            "run_monitors": Optional[List[str]],
+            "run_managers": Optional[List[str]],
+            "additional_fields": Optional[Dict[str, Any]],
+            "model_config": {"arbitrary_types_allowed": True}
+        }
         self.runs[run_id] = request.model_dump()
         return {"run_id": str(run_id), "status": "SUCCEEDED"}
 

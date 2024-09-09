@@ -4,7 +4,7 @@ from dateutil import parser
 import logging
 import os
 from pathlib import Path
-from time import time, sleep
+from time import time
 from typing import Dict, List
 from dotenv import load_dotenv
 from globus_sdk import (
@@ -94,13 +94,13 @@ def init_transfer_client(app: GlobusApp) -> TransferClient:
 def start_transfer(
     transfer_client: TransferClient,
     source_endpoint: GlobusEndpoint,
-    source_file: str,
+    source_path: str,
     dest_endpoint: GlobusEndpoint,
     dest_path: str,
     max_wait_seconds=600,
     logger=logger,
 ):
-    source_path = Path(source_file)
+    source_path = Path(source_path)
     label = source_path.stem
     tdata = TransferData(
         transfer_client,
@@ -115,9 +115,9 @@ def start_transfer(
             relative_path = item.relative_to(source_path.parent)
             tdata.add_item(str(item), os.path.join(dest_path, str(relative_path)))
     else:
-        tdata.add_item(source_file, dest_path)
+        tdata.add_item(source_path, dest_path)
     logger.info(
-        f"starting transfer {source_endpoint.uri}:{source_file} to {dest_endpoint.uri}:{dest_path}"
+        f"starting transfer {source_endpoint.uri}:{source_path} to {dest_endpoint.uri}:{dest_path}"
     )
 
     task = transfer_client.submit_transfer(tdata)
@@ -229,24 +229,6 @@ def prune_files(
         return task_id
 
 
-# Function to monitor the delete task
-def monitor_task(transfer_client, task_id):
-    while True:
-        task = transfer_client.get_task(task_id)
-        status = task["status"]
-        print(f"Task {task_id} status: {status}")
-        print(task)
-
-        if status == "FAILED":
-            error_message = task
-            print(f"Task {task_id} failed with error: {error_message}")
-            break
-        elif status in ["SUCCEEDED", "CANCELED"]:
-            break
-
-        sleep(5)  # Wait for 5 seconds before checking again
-
-
 def rename(
     transfer_client: TransferClient,
     endpoint: GlobusEndpoint,
@@ -333,41 +315,5 @@ def prune_one_safe(
         logger=logger,
     )
 
-    monitor_task(tranfer_client, delete_id)
+    task_wait(tranfer_client, delete_id)
     logger.info(f"file deleted from: {source_endpoint.uri}")
-
-
-if __name__ == "__main__":
-    from orchestration.flows.bl832.config import Config832
-    # import pickle
-    config = Config832()
-
-    # endpoints = build_endpoints(config)
-    # apps = build_apps(config)
-    # tc = init_transfer_client(apps["als_transfer"])
-    # source_ep = endpoints["spot832"]
-    # dest_ep = endpoints["data832"]
-    # task_id = start_transfer(
-    #     tc,
-    #     source_ep,
-    #     "/raw/dmcreynolds/test2.txt",
-    #     dest_ep,
-    #     "/data/raw/dmcreynolds/test2.txt",
-    # )
-    # while not tc.task_wait(task_id, timeout=5):
-    #     print("Another second went by without {0} terminating".format(task_id))
-
-    # tc = None
-    # try:
-    #     with open("transfer_client.pkl", "rb") as f:
-    #         tc = pickle.load(f)
-    # except:
-    #     if tc is None:
-    #         tc = initialize_transfer_client() #pickle to disk
-    #         with open("transfer_client.pkl", "wb") as f:
-    #             pickle.dump(tc, f)
-
-    # delete_id = prune_files(tc,
-    #                         config.alcf832_scratch,
-    #                         ["/bl832_test/scratch/BLS-00564_dyparkinson/rec20230224_132553_sea_shell.zarr/"])
-    # monitor_task(tc, delete_id)

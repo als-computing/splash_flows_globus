@@ -1,6 +1,6 @@
 # 8.3.2 ALCF Globus Flow And Reconstruction Setup
 
-This script facilitates transferring and processing raw tomography data from Beamline 8.3.2 at Berkeley Lab's Advanced Light Source (ALS) to the Argonne Leadership Computing Facility (ALCF). This script relies on Prefect for workflow orchestration, Globus Transfer for data movement between facilities, and Globus Compute at ALCF for tomographic reconstruction using Tomopy.
+This document outlines the steps required to set up and run Globus Transfer and Compute Flows for transferring and processing raw tomography data from Beamline 8.3.2 at Berkeley Lab's Advanced Light Source (ALS) to the Argonne Leadership Computing Facility (ALCF). This script relies on Prefect for workflow orchestration, Globus Transfer for data movement between facilities, and Globus Compute at ALCF for tomographic reconstruction using Tomopy.
 
 Follow these steps to log in to ALCF Polaris, start a Globus compute endpoint signed in using a Globus confidential client, register a reconstruction function and flow, and run the flow using [`orchestration/flows/bl832/alcf.py`](orchestration/flows/bl832/alcf.py).
 
@@ -42,12 +42,12 @@ init: {
 }%%
 graph TD
     A[Beamline 8.3.2] -->|Collect Data| B[spot832]
-    B -->|Transfer to data832| C[ /data/raw/< experiment folder name convention>/< h5 files>]
+    B -->|Globus Transfer to data832| C[ /data/raw/< experiment folder name convention>/< h5 files>]
     C -->|Start This Prefect Flow| D[ python orchestration/flows/bl832/alcf.py ]
-    D -->|Step 1: Transfer from data832 to ALCF| E[ /eagle/IRIBeta/als/bl832/raw/< experiment folder name convention>/< h5 files>]
-    E -->|Step 2: Run Globus Flows on ALCF Globus Compute Endpoint| F[ A: Run reconstruction.py <br> B: Run tiff_to_zarr.py]
+    D -->|Step 1: Globus Transfer from data832 to ALCF| E[ /eagle/IRIBeta/als/bl832/raw/< experiment folder name convention>/< h5 files>]
+    E -->|Step 2: Run Globus Flows on ALCF Globus Compute Endpoint| F[ A: Run globus_reconstruction.py <br> B: Run tiff_to_zarr.py]
     F -->|Save Reconstruction on ALCF| G[ /eagle/IRIBeta/als/bl832/scratch/< experiment folder name convention>/rec< dataset>/< tiffs> <br> /eagle/IRIBeta/als/bl832/scratch/< experiment folder name convention>/rec< dataset>.zarr/ ]
-    G -->|Step 3: Transfer back to data832| J[ /data/scratch/globus_share/< experiment folder name convention>/rec< dataset>/< tiffs> <br> /data/scratch/globus_share/< experiment folder name convention>/rec< dataset>.zarr/ ]
+    G -->|Step 3: Globus Transfer back to data832| J[ /data/scratch/globus_share/< experiment folder name convention>/rec< dataset>/< tiffs> <br> /data/scratch/globus_share/< experiment folder name convention>/rec< dataset>.zarr/ ]
     J -->|Schedule Pruning| L[Prune raw and scratch data from ALCF and data832]
     J --> M[Visualize Results] 
     J -->|SciCat| N[TODO: ingest metadata into SciCat]
@@ -90,34 +90,31 @@ graph TD
 - `/eagle/IRIBeta/als/bl832/scratch/< Experiment folder name convention>/rec< dataset>/< tiffs>`
 - `/eagle/IRIBeta/als/bl832/scratch/< Experiment folder name convention>/rec< dataset>.zarr/`
 
-## Globus Compute Flow
+## Globus Compute Flows
 
-The preferred method for scheduling jobs on ALCF is through Globus Compute. This `reconstruction_wrapper()` function contains the code registered with Globus, which runs the reconstruction on ALCF. The commands call two Python programs located in the IRIBeta project folder on Polaris. Here is an example of code that is registered and run in the Globus Compute Flow:
-```python
-def  reconstruction_wrapper(rundir,  h5_file_name,  folder_path):
-	...
-	# Run reconstruction.py
-	# Output: A folder of tiff images
-    command =  f"python /eagle/IRIBeta/als/example/globus_reconstruction.py {h5_file_name}  {folder_path}"
-    recon_res = subprocess.run(command.split("  "),  stdout=subprocess.PIPE,  stderr=subprocess.PIPE)
-	...
-	# Run tiff_to_zarr.py
-	# Output: .zarr directory
-    file_name = h5_file_name[:-3]  if h5_file_name.endswith('.h5')  else h5_file_name
-    command =  f"python /eagle/IRIBeta/als/example/tiff_to_zarr.py /eagle/IRIBeta/als/bl832_test/scratch/{folder_path}/rec{file_name}/"  # --zarr_directory /path/to/storage/"
-    zarr_res = subprocess.run(command.split("  "),  stdout=subprocess.PIPE,  stderr=subprocess.PIPE)
-```
+The preferred method for scheduling jobs on ALCF is through Globus Compute. This is done by registering a function containing the code to run with Globus Compute Flows, which will then be called when running the reconstruction on ALCF. Two scripts are included in this repository that set up reconstruction and Zarr conversion Globus Compute Flows:
+
+- **Reconstruction**
+	- [`/scripts/init_reconstruction_globus_flow.py`](/scripts/init_reconstruction_globus_flow.py)
+	- `reconstruction_wrapper()` defines the function registered with Globus Compute.
+- **Tiff to Zarr**
+	- [`/scripts/init_tiff_to_zarr_globus_flow.py`](/scripts/init_tiff_to_zarr_globus_flow.py)
+	- `conversion_wrapper()` defines the function registered with Globus Compute.
+
+
 ### Reconstruction
 
 The `globus_reconstruction.py` script in this flow is a slightly modified version of Dula Parkinson's tomography reconstruction code.  The modifications update the function's input parameters and set proper file/folder permissions for the reconstructed data.
 
-Location on Polaris: `/eagle/IRIBeta/als/example/globus_reconstruction.py`
+- Location in this repo: [`/scripts/polaris/globus_reconstruction.py`](/scripts/polaris/globus_reconstruction.py)
+- Location on Polaris: `/eagle/IRIBeta/als/example/globus_reconstruction.py`
 
-### Zarr Generation
+### Zarr Conversion
 
 Once the raw data has been reconstructed into a series of .tiff images, the script `tiff_to_zarr.py` transforms the images into a multiresolution .zarr directory, enabling 3D visualization. This code was adapted from the `view_tiff.ipynb` notebook and converted into a Python module. 
 
-Polaris: `/eagle/IRIBeta/als/example/tiff_to_zarr.py`
+- Location in this repo: [`/scripts/polaris/tiff_to_zarr.py`](/scripts/polaris/tiff_to_zarr.py)
+- Location on Polaris: `/eagle/IRIBeta/als/example/tiff_to_zarr.py`
 
 ## Pruning
 

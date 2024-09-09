@@ -347,11 +347,14 @@ def alcf_tomopy_reconstruction_flow(
 
     success = False
 
+    run_monitors = ["urn:globus:auth:identity:c4765424-d274-11e5-b894-cb4139f74ecf",
+                    "urn:globus:auth:identity:ce709f24-a3d2-428a-b212-36bf45ef9166"]
     try:
         logger.info("Starting globus flow action")
         flow_action = specific_flow_client.run_flow(flow_input,
                                                     label="ALS run",
-                                                    tags=["demo", "als", "tomopy"])
+                                                    tags=["demo", "als", "tomopy"],
+                                                    run_monitors=run_monitors)
         flow_run_id = flow_action['action_id']
         logger.info(flow_action)
         logger.info(f'Flow action started with id: {flow_run_id}')
@@ -610,12 +613,7 @@ def process_new_832_ALCF_flow(folder_name: str,
 
         # Step 4: Schedule deletion of files from ALCF, NERSC, and data832
         logger.info("Scheduling deletion of files from ALCF, NERSC, and data832")
-        # alcf_transfer_success = True
         nersc_transfer_success = False
-        # alcf_reconstruction_success = True
-        # alcf_tiff_to_zarr_success = True
-        # data832_tiff_transfer_success = True
-        # data832_zarr_transfer_success = True
 
         schedule_pruning(
             alcf_raw_path=f"{folder_name}/{h5_file_name}" if alcf_transfer_success else None,
@@ -653,10 +651,8 @@ def process_new_832_ALCF_flow(folder_name: str,
 
 
 if __name__ == "__main__":
-    # folder_name = str('BLS-00564_dyparkinson')
-    # file_name = str('20230224_132553_sea_shell')
-    folder_name = str('dabramov')
-    file_name = str('20240425_104614_nist-sand-30-100_27keV_z8mm_n2625')
+    folder_name = 'dabramov'
+    file_name = '20240425_104614_nist-sand-30-100_27keV_z8mm_n2625'
     flow_success = process_new_832_ALCF_flow(folder_name=folder_name,
                                              file_name=file_name,
                                              is_export_control=False,
