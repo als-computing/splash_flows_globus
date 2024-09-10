@@ -9,7 +9,7 @@ from pytest import MonkeyPatch
 from globus_sdk import TransferData
 
 from orchestration.config import read_config
-from orchestration.globus import (
+from orchestration.globus.transfer import (
     build_endpoints,
     GlobusEndpoint,
     is_globus_file_older,

@@ -10,6 +10,66 @@ globus:
       uri: data832.lbl.gov
       uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
 
+    data832_raw:
+      root_path: /data/raw
+      uri: data832.lbl.gov
+      uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
+      name: data832_raw
+
+    data832_scratch:
+      root_path: /data/scratch/globus_share
+      uri: data832.lbl.gov
+      uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
+      name: data832_scratch
+
+    alcf832_raw:
+      root_path: /bl832/raw
+      uri: alcf.anl.gov
+      uuid: 55c3adf6-31f1-4647-9a38-52591642f7e7
+      name: alcf_raw
+
+    alcf832_scratch:
+      root_path: /bl832/scratch
+      uri: alcf.anl.gov
+      uuid: 55c3adf6-31f1-4647-9a38-52591642f7e7
+      name: alcf_scratch
+
+    alcf_eagle832:
+      root_path: /IRIBeta/als/example
+      uri: alcf.anl.gov
+      uuid: 05d2c76a-e867-4f67-aa57-76edeb0beda0
+      name: alcf_eagle832
+
+    alcf_home832:
+      root_path: / #alcf /home/username
+      uri: alcf.anl.gov
+      uuid: 9032dd3a-e841-4687-a163-2720da731b5b
+      name: alcf_home832
+
+    nersc_test:
+      root_path: /global/cfs/cdirs/als/data_mover/share/dabramov
+      uri: nersc.gov
+      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
+      name: nersc_test
+
+    nersc_alsdev:
+      root_path: /global/homes/a/alsdev/test_directory/
+      uri: nersc.gov
+      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
+      name: nersc_alsdev
+
+    nersc832_alsdev_raw:
+      root_path: /global/cfs/cdirs/als/data_mover/8.3.2/raw
+      uri: nersc.gov
+      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
+      name: nersc832_alsdev_raw
+
+    nersc832_alsdev_scratch:
+      root_path: /global/cfs/cdirs/als/data_mover/8.3.2/scratch
+      uri: nersc.gov
+      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
+      name: nersc832_alsdev_scratch
+
     nersc832:
       root_path: /global/cfs/cdirs/als/data_mover/8.3.2
       uri: nersc.gov
