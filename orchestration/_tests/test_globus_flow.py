@@ -1,19 +1,16 @@
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 import warnings
 
 from globus_compute_sdk.sdk.client import Client
-
-from prefect.testing.utilities import prefect_test_harness
 from prefect.blocks.system import JSON, Secret
-from pydantic import BaseModel, PydanticDeprecatedSince20
+from prefect.testing.utilities import prefect_test_harness
 import pytest
 from pytest_mock import MockFixture
 
 from .test_globus import MockTransferClient
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -48,18 +45,6 @@ def prefect_test_fixture():
         pruning_config = JSON(value={"max_wait_seconds": 600})
         pruning_config.save(name="pruning-config")
         yield
-
-
-class FlowDefinition(BaseModel):
-    """Model for flow definition"""
-    StartAt: str
-    States: Dict[str, Dict[str, Any]]
-
-
-class FlowInputSchema(BaseModel):
-    """Model for flow input schema"""
-    type: str
-    properties: Dict[str, Dict[str, Any]]
 
 
 class MockEndpoint:
@@ -153,8 +138,6 @@ class MockFlowsClient:
         flow_id = UUID("123e4567-e89b-12d3-a456-426614174000")
         request = {
             "title": str,
-            "definition": FlowDefinition,
-            "input_schema": FlowInputSchema,
             "subtitle": Optional[str],
             "description": Optional[str],
             "flow_viewers": Optional[List[str]],
