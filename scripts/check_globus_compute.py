@@ -1,3 +1,4 @@
+
 from dotenv import load_dotenv
 import typer
 from typing import Optional
@@ -59,7 +60,7 @@ def check_globus_compute_status(endpoint_id: str) -> bool:
         logger.error(f"Failed to check endpoint status: {str(e)}")
         return False
 
-
+      
 @app.command()
 def main(endpoint_id: str) -> None:
     """

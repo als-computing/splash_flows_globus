@@ -116,6 +116,7 @@ def start_transfer(
             tdata.add_item(str(item), os.path.join(dest_path, str(relative_path)))
     else:
         tdata.add_item(str(source_path), str(dest_path))
+
     logger.info(
         f"starting transfer {source_endpoint.uri}:{source_path} to {dest_endpoint.uri}:{dest_path}"
     )
