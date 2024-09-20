@@ -1,5 +1,5 @@
-import argparse
 from dotenv import load_dotenv
+import typer
 from typing import Optional
 
 from globus_compute_sdk.sdk.login_manager import LoginManager
@@ -7,6 +7,8 @@ from globus_compute_sdk import Client
 from prefect import task, flow, get_run_logger
 
 load_dotenv()
+
+app = typer.Typer()
 
 
 @task
@@ -58,28 +60,26 @@ def check_globus_compute_status(endpoint_id: str) -> bool:
         return False
 
 
-def main() -> None:
+@app.command()
+def main(endpoint_id: str) -> None:
     """
-    Main function to parse command-line arguments and check the Globus Compute endpoint status.
+    Check the status of a Globus Compute endpoint by providing the endpoint_id.
+
     Example usage:
-    python check_globus_compute.py --endpoint_id "your-uuid-here"
+    python check_globus_compute.py --endpoint-id "your-uuid-here"
 
     IMPORTANT:
-    Ensure you are logged into Globus Compute
+    Ensure you are logged into Globus Compute and have set the environment variables for the client credentials:
     export GLOBUS_COMPUTE_CLIENT_ID="your-client-id" & export GLOBUS_COMPUTE_CLIENT_SECRET="your-client-secret"
-    :return: None
+
+    :param endpoint_id: The UUID of the Globus Compute endpoint.
     """
-    parser = argparse.ArgumentParser(description="Check the status of a Globus Compute endpoint.")
-    parser.add_argument('--endpoint_id', type=str, required=True, help="The UUID of the Globus Compute endpoint.")
-
-    args = parser.parse_args()
-
-    online = check_globus_compute_status(args.endpoint_id)
+    online = check_globus_compute_status(endpoint_id)
     if online:
-        print(f"Endpoint {args.endpoint_id} is online.")
+        typer.echo(f"Endpoint {endpoint_id} is online.")
     else:
-        print(f"Endpoint {args.endpoint_id} is not online.")
+        typer.echo(f"Endpoint {endpoint_id} is not online.")
 
 
 if __name__ == "__main__":
-    main()
+    app()
