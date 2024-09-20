@@ -1,7 +1,7 @@
-import argparse
 from dotenv import load_dotenv
 import os
 import time
+import typer
 
 import globus_sdk
 from prefect import flow, task, get_run_logger
@@ -13,6 +13,8 @@ load_dotenv()
 CLIENT_ID: Optional[str] = os.getenv('GLOBUS_CLIENT_ID')
 CLIENT_SECRET: Optional[str] = os.getenv('GLOBUS_CLIENT_SECRET')
 SCOPES: str = "urn:globus:auth:scope:transfer.api.globus.org:all"
+
+app = typer.Typer()
 
 
 @task
@@ -215,41 +217,36 @@ def check_globus_transfer_permissions(endpoint_id: str,
         logger.info(f"list_directory (after creating {directory_name}) successful: {success_list_directory_after}")
 
 
-def main() -> None:
+@app.command()
+def main(endpoint_id: str,
+         transfer_client: Optional[globus_sdk.TransferClient],
+         list_contents: bool = True,
+         create_test_directory: bool = True,
+         delete_test_directory: bool = True,
+         directory_name: str = "test_directory/") -> None:
     """
     Main function to parse command-line arguments and run the check_globus_transfer_permissions flow.
 
     Run from the command line:
     python check_globus_transfer.py --endpoint_id "your-endpoint-id" --directory_name "your-directory-name"
 
-    Command-line arguments:
-        --endpoint_id (str): The UUID of the endpoint to operate on.
-        --list_contents (bool): Whether to list directory contents. Default is True.
-        --create_test_directory (bool): Whether to create a directory. Default is True.
-        --delete_test_directory (bool): Whether to delete the directory. Default is True.
-        --directory_name (str): The name of the directory to create or delete. Default is "test_directory".
+    Args:
+        endpoint_id (str): The UUID of the Globus endpoint.
+        list_contents (bool): Whether to list directory contents. Default is True.
+        create_test_directory (bool): Whether to create a directory. Default is True.
+        delete_test_directory (bool): Whether to delete the directory. Default is True.
+        directory_name (str): The name of the directory to create or delete. Default is "test_directory/".
     """
-    parser = argparse.ArgumentParser(description="Run Globus transfer operations on a specified endpoint.")
-    parser.add_argument('--endpoint_id', type=str, required=True, help="The UUID of the Globus endpoint.")
-    parser.add_argument('--list_contents', type=bool, default=True, help="Whether to list directory contents.")
-    parser.add_argument('--create_test_directory', type=bool, default=True,
-                        help="Whether to create a directory.")
-    parser.add_argument('--delete_test_directory', type=bool, default=True,
-                        help="Whether to delete the directory.")
-    parser.add_argument('--directory_name', type=str, default="test_directory/",
-                        help="The name of the directory to create or delete.")
-
-    args = parser.parse_args()
 
     check_globus_transfer_permissions(
-        endpoint_id=args.endpoint_id,
+        endpoint_id=endpoint_id,
         transfer_client=None,
-        list_contents=args.list_contents,
-        create_test_directory=args.create_test_directory,
-        delete_test_directory=args.delete_test_directory,
-        directory_name=args.directory_name
+        list_contents=list_contents,
+        create_test_directory=create_test_directory,
+        delete_test_directory=delete_test_directory,
+        directory_name=directory_name
     )
 
 
 if __name__ == "__main__":
-    main()
+    app()
