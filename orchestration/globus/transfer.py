@@ -94,9 +94,9 @@ def init_transfer_client(app: GlobusApp) -> TransferClient:
 def start_transfer(
     transfer_client: TransferClient,
     source_endpoint: GlobusEndpoint,
-    source_path: str,
+    source_path: Path,
     dest_endpoint: GlobusEndpoint,
-    dest_path: str,
+    dest_path: Path,
     max_wait_seconds=600,
     logger=logger,
 ):
