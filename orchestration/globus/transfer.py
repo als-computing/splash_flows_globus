@@ -94,9 +94,9 @@ def init_transfer_client(app: GlobusApp) -> TransferClient:
 def start_transfer(
     transfer_client: TransferClient,
     source_endpoint: GlobusEndpoint,
-    source_path: Path,
+    source_path: str,
     dest_endpoint: GlobusEndpoint,
-    dest_path: Path,
+    dest_path: str,
     max_wait_seconds=600,
     logger=logger,
 ):
@@ -115,7 +115,7 @@ def start_transfer(
             relative_path = item.relative_to(source_path.parent)
             tdata.add_item(str(item), os.path.join(dest_path, str(relative_path)))
     else:
-        tdata.add_item(str(source_path), str(dest_path))
+        tdata.add_item(str(source_path), dest_path)
     logger.info(
         f"starting transfer {source_endpoint.uri}:{source_path} to {dest_endpoint.uri}:{dest_path}"
     )
