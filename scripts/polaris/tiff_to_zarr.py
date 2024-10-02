@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
-import os
 import argparse
+import os
+
+import dxchange
 from ngff_zarr import (
     detect_cli_io_backend,
     cli_input_to_ngff_image,
@@ -18,6 +20,11 @@ def parse_arguments():
                         type=str,
                         default=None,
                         help='Directory to store Zarr output. Default is new folder in input directory.')
+    parser.add_argument('--raw_directory',
+                        type=str,
+                        default=None,
+                        help='Directory containing the raw hdf5 file (for reading pixelsize metadata).')
+
     return parser.parse_args()
 
 
@@ -28,6 +35,13 @@ def set_permissions_recursive(path, permissions=0o2775):
         for file in files:
             os.chmod(os.path.join(root, file), permissions)
     os.chmod(path, permissions)  # Also set permissions for the top-level directory
+
+
+def read_pixelsize_from_hdf5(raw_directory: str) -> dict:
+    pxsize = dxchange.read_hdf5(raw_directory,
+                                "/measurement/instrument/detector/pixel_size")[0]  # Expect mm
+    pxsize = pxsize * 1000  # Convert to micrometer
+    return {'x': pxsize, 'y': pxsize, 'z': pxsize}
 
 
 def main():
@@ -58,8 +72,9 @@ def main():
     backend = detect_cli_io_backend(file_paths)
     image = cli_input_to_ngff_image(backend, file_paths)
     # The scale and axis units are the same as the one printed in the reconstruction script
-    image.scale = {'z': 0.65, 'y': 0.65, 'x': 0.65}
-    image.axes_units = {'z': 'micrometer', 'y': 'micrometer', 'x': 'micrometer'}
+    # image.scale = {'z': 0.65, 'y': 0.65, 'x': 0.65}
+    image.scale = read_pixelsize_from_hdf5(args.raw_directory)
+    image.axes_units = {'x': 'micrometer', 'y': 'micrometer', 'z': 'micrometer'}
     multiscales = to_multiscales(image, method=Methods.DASK_IMAGE_GAUSSIAN, cache=False)
     to_ngff_zarr(zarr_dir, multiscales)
     print('NGFF Zarr created')

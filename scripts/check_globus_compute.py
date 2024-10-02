@@ -66,7 +66,7 @@ def main(endpoint_id: str) -> None:
     Check the status of a Globus Compute endpoint by providing the endpoint_id.
 
     Example usage:
-    python check_globus_compute.py --endpoint-id "your-uuid-here"
+    python check_globus_compute.py "your-uuid-here"
 
     IMPORTANT:
     Ensure you are logged into Globus Compute and have set the environment variables for the client credentials:
