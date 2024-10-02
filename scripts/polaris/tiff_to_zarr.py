@@ -62,7 +62,6 @@ def main():
     if not zarr_dir:
         last_part = os.path.basename(os.path.normpath(tiff_dir))
         zarr_dir = os.path.abspath(os.path.join(tiff_dir, '..', last_part + '.zarr'))
-        # zarr_dir = os.path.abspath(os.path.join(tiff_dir, '..', os.path.basename(tiff_dir) + '.zarr'))
     if not os.path.exists(zarr_dir):
         os.makedirs(zarr_dir)
 
@@ -72,7 +71,6 @@ def main():
     backend = detect_cli_io_backend(file_paths)
     image = cli_input_to_ngff_image(backend, file_paths)
     # The scale and axis units are the same as the one printed in the reconstruction script
-    # image.scale = {'z': 0.65, 'y': 0.65, 'x': 0.65}
     image.scale = read_pixelsize_from_hdf5(args.raw_directory)
     image.axes_units = {'x': 'micrometer', 'y': 'micrometer', 'z': 'micrometer'}
     multiscales = to_multiscales(image, method=Methods.DASK_IMAGE_GAUSSIAN, cache=False)
