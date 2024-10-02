@@ -2,7 +2,6 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 import warnings
 
-from globus_compute_sdk.sdk.client import Client
 from prefect.blocks.system import JSON, Secret
 from prefect.testing.utilities import prefect_test_harness
 import pytest
@@ -101,9 +100,9 @@ class MockConfig832():
 
 
 # Mock the Client class to avoid real network calls
-class MockGlobusComputeClient(Client):
+class MockGlobusComputeClient:
     def __init__(self, *args, **kwargs):
-        # Skip initializing the real client
+        # No real initialization, as this is a mock
         pass
 
     def version_check(self):
@@ -111,11 +110,11 @@ class MockGlobusComputeClient(Client):
         pass
 
     def run(self, *args, **kwargs):
-        # Mock run to return a fake task ID
+        # Return a mock task ID
         return "mock_task_id"
 
     def get_task(self, task_id):
-        # Mock getting task to return a successful result
+        # Return a mock task response
         return {
             "pending": False,
             "status": "success",
@@ -123,7 +122,7 @@ class MockGlobusComputeClient(Client):
         }
 
     def get_result(self, task_id):
-        # Mock getting the result of a task
+        # Return a mock result
         return "mock_result"
 
 
