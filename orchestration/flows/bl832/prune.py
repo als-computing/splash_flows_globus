@@ -51,7 +51,7 @@ def prune_spot832(relative_path: str):
 def prune_data832(relative_path: str):
     prune_files(relative_path=relative_path,
                 source_endpoint=Config832().data832,
-                check_endpoint=Config832.nersc832)
+                check_endpoint=Config832().nersc832)
 
 
 @flow(name="prune_data832_raw")

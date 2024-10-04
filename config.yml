@@ -4,11 +4,13 @@ globus:
       root_path: /
       uri: spot832.lbl.gov
       uuid: 44ae904c-ab64-4145-a8f0-7287de38324d
-    
+      name: spot832
+
     data832:
       root_path: /data
       uri: data832.lbl.gov
       uuid: 75b478b2-37af-46df-bfbd-71ed692c6506
+      name: data832
 
     data832_raw:
       root_path: /data/raw
@@ -74,6 +76,7 @@ globus:
       root_path: /global/cfs/cdirs/als/data_mover/8.3.2
       uri: nersc.gov
       uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
+      name: nersc832
 
     nersc7012:
       root_path: /global/cfs/cdirs/als/gsharing/data_mover/7012
@@ -94,8 +97,8 @@ globus:
 
 prefect:
   deployments:
-    - type_spec: new_file_832
-      uuid: ccf2cb27-d4f8-420b-8115-a5036c69b1da
+  - type_spec: new_file_832
+    uuid: ccf2cb27-d4f8-420b-8115-a5036c69b1da
 
 scicat:
   jobs_api_url: https://dataportal.als.lbl.gov/api/ingest/jobs
