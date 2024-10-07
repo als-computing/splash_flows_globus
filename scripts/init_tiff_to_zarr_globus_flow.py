@@ -1,5 +1,5 @@
 from globus_compute_sdk import Client, Executor
-from prefect.blocks.system import Secret
+from prefect.blocks.system import Secret, JSON
 from prefect import task, flow, get_run_logger
 
 from check_globus_compute import check_globus_compute_status
@@ -18,7 +18,8 @@ def get_polaris_endpoint_id() -> str:
     return compute_endpoint_id
 
 
-def conversion_wrapper(rundir, h5_file_name, folder_path):
+# def conversion_wrapper(rundir, h5_file_name, folder_path):
+def conversion_wrapper(rundir, recon_path, raw_path):
     """
     Python function that wraps around the application call for Tomopy reconstruction on ALCF
 
@@ -31,25 +32,16 @@ def conversion_wrapper(rundir, h5_file_name, folder_path):
     """
     import os
     import subprocess
-    import time
-
-    start = time.time()
 
     # Move to directory where data are located
     os.chdir(rundir)
 
     # Convert tiff files to zarr
-    file_name = h5_file_name[:-3] if h5_file_name.endswith('.h5') else h5_file_name
-    command = (
-        f"python /eagle/IRIBeta/als/example/tiff_to_zarr.py "
-        f"/eagle/IRIBeta/als/bl832/scratch/{folder_path}/rec{file_name}/"
-    )
+    command = (f"python /eagle/IRIBeta/als/example/tiff_to_zarr.py {recon_path} --raw_directory {raw_path}")
     zarr_res = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    end = time.time()
-
     return (
-        f"Converted tiff files to zarr in {end-start} seconds;\n {zarr_res}"
+        f"Converted tiff files to zarr;\n {zarr_res}"
     )
 
 
@@ -76,7 +68,18 @@ def create_flow_definition():
     return flow_definition
 
 
-@flow(name="setup-tiff-to-zarr-flow")
+@task(name="update_flow_in_prefect")
+def update_flow_in_prefect(conversion_func: str, flow_id: str) -> None:
+    # Create JSON block with flow_id
+    flow_json = JSON(value={"flow_id": flow_id})
+    flow_json.save(name="globus-tiff-to-zarr-flow-id", overwrite=True)
+
+    # Create JSON block with conversion_func
+    func_json = JSON(value={"conversion_func": conversion_func})
+    func_json.save(name="globus-tiff-to-zarr-function", overwrite=True)
+
+
+@flow(name="setup_tiff_to_zarr_flow")
 def setup_tiff_to_zarr_flow() -> None:
     logger = get_run_logger()
 
@@ -85,7 +88,7 @@ def setup_tiff_to_zarr_flow() -> None:
     gce = Executor(endpoint_id=get_polaris_endpoint_id())
     print(gce)
 
-    reconstruction_func = gc.register_function(conversion_wrapper)
+    conversion_func = gc.register_function(conversion_wrapper)
 
     flows_client = get_flows_client()
     flow = flows_client.create_flow(definition=create_flow_definition(),
@@ -94,9 +97,10 @@ def setup_tiff_to_zarr_flow() -> None:
     flow_id = flow['id']
 
     # flow_scope = flow['globus_auth_scope']
-    # logger.info(f'Flow scope:\n{flow_scope}')
-    logger.info(f"Registered function UUID: {reconstruction_func}")
+    logger.info(f"Registered function UUID: {conversion_func}")
     logger.info(f"Flow UUID: {flow_id}")
+
+    update_flow_in_prefect(conversion_func, flow_id)
 
 
 if __name__ == "__main__":

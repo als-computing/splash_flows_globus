@@ -76,7 +76,10 @@ def transfer_data_to_nersc(
 
 
 @flow(name="new_832_file_flow")
-def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=True):
+def process_new_832_file(file_path: str,
+                         is_export_control=False,
+                         send_to_nersc=True,
+                         config=None):
     """
     Sends a file along a path:
         - Copy from spot832 to data832
@@ -96,7 +99,8 @@ def process_new_832_file(file_path: str, is_export_control=False, send_to_nersc=
 
     logger = get_run_logger()
     logger.info("starting flow")
-    config = Config832()
+    if not config:
+        config = Config832()
 
     # paths come in from the app on spot832 as /global/raw/...
     # remove 'global' so that all paths start with 'raw', which is common

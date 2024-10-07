@@ -392,16 +392,13 @@ def alcf_tomopy_reconstruction_flow(
 @flow(name="alcf_tiff_to_zarr_globus_flow")
 def alcf_tiff_to_zarr_flow(
         raw_path: str,
-        scratch_path: str,
-        folder_name: str,
-        file_name: str) -> bool:
+        tiff_scratch_path: str) -> bool:
     """
     Run the Tomopy reconstruction flow on the ALCF.
 
     Args:
         raw_path (str): The path to the raw data on ALCF.
-        scratch_path (str): The path to the scratch directory on ALCF.
-        file_name (str): The name of the file to be processed.
+        tiff_scratch_path (str): The path to the scratch directory on ALCF.
 
     Returns:
         bool: The success status of the flow ('True', 'False').
@@ -417,17 +414,14 @@ def alcf_tiff_to_zarr_flow(
     gce = Executor(endpoint_id=polaris_endpoint_id.get(), client=gcc)
     print(gce)
 
-    tiff_to_zarr_function = Secret.load("globus-tiff-to-zarr-function")
+    tiff_to_zarr_function = JSON.load("globus-tiff-to-zarr-function").value["conversion_func"]
     source_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
     destination_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
 
-    # logger.info(f"Using compute_endpoint_id: {polaris_endpoint_id.get()}")
-    logger.info(f"Using tiff_to_zarr_function: {tiff_to_zarr_function.get()}")
-    # logger.info(f"Using source_collection_endpoint: {source_collection_endpoint.get()}")
-
     function_inputs = {"rundir": "/eagle/IRIBeta/als/bl832/raw",
-                       "h5_file_name": file_name,
-                       "folder_path": folder_name}
+                       "recon_path": tiff_scratch_path,
+                       "raw_path": raw_path
+                       }
 
     # Define the json flow
     # class FlowInput(BaseModel):
@@ -448,11 +442,11 @@ def alcf_tiff_to_zarr_flow(
             },
             "destination": {
                 "id": destination_collection_endpoint.get(),
-                "path": scratch_path
+                "path": tiff_scratch_path
             },
             "recursive_tx": True,
             "compute_endpoint_id": polaris_endpoint_id.get(),
-            "compute_function_id": tiff_to_zarr_function.get(),
+            "compute_function_id": tiff_to_zarr_function,
             "compute_function_kwargs": function_inputs
         }
     }
@@ -460,17 +454,17 @@ def alcf_tiff_to_zarr_flow(
     collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
 
     # Flow ID (only generate once!)
-    flow_id = Secret.load("globus-tiff-to-zarr-flow-id")
+    flow_id = JSON.load("globus-tiff-to-zarr-flow-id").value["flow_id"]
 
-    logger.info(f"tiff_to_zarr_function: {tiff_to_zarr_function.get()}")
-    logger.info(f"flow_id: {flow_id.get()}")
+    logger.info(f"tiff_to_zarr_function: {tiff_to_zarr_function}")
+    logger.info(f"flow_id: {flow_id}")
 
     # Start the timer
     start_time = time.time()
 
     # Run the flow
     flow_client = get_flows_client()
-    specific_flow_client = get_specific_flow_client(flow_id.get(), collection_ids=collection_ids)
+    specific_flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
 
     success = False
 
@@ -577,10 +571,10 @@ def process_new_832_ALCF_flow(folder_name: str,
 
         # Step 2B: Run the Tiff to Zarr Globus Flow
         logger.info(f"Running Tiff to Zarr on {file_name} at ALCF")
-        alcf_tiff_to_zarr_success = alcf_tiff_to_zarr_flow(raw_path=alcf_raw_path,
-                                                           scratch_path=alcf_scratch_path,
-                                                           folder_name=folder_name,
-                                                           file_name=h5_file_name)
+        raw_path = f"/eagle/IRIBeta/als/{alcf_raw_path}/{h5_file_name}"
+        tiff_scratch_path = f"/eagle/IRIBeta/als/bl832/scratch/{folder_name}/rec{file_name}/"
+        alcf_tiff_to_zarr_success = alcf_tiff_to_zarr_flow(raw_path=raw_path,
+                                                           tiff_scratch_path=tiff_scratch_path)
         if not alcf_tiff_to_zarr_success:
             logger.error("Tiff to Zarr Failed.")
         else:
