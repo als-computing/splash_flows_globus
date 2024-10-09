@@ -290,17 +290,24 @@ def alcf_tomopy_reconstruction_flow(
     gce = Executor(endpoint_id=polaris_endpoint_id.get(), client=gcc)
     print(gce)
 
-    reconstruction_func = Secret.load("globus-reconstruction-function")
+    reconstruction_func = JSON.load("globus-reconstruction-function").value["reconstruction_func"]
     source_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
     destination_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
 
-    # logger.info(f"Using compute_endpoint_id: {polaris_endpoint_id.get()}")
-    logger.info(f"Using reconstruction_func: {reconstruction_func.get()}")
-    # logger.info(f"Using source_collection_endpoint: {source_collection_endpoint.get()}")
+    logger.info(f"Using reconstruction_func: {reconstruction_func}")
 
-    function_inputs = {"rundir": "/eagle/IRIBeta/als/bl832/raw",
-                       "h5_file_name": file_name,
-                       "folder_path": folder_name}
+    iribeta_rundir = "/eagle/IRIBeta/als/bl832/raw"
+    iribeta_recon_script = "/eagle/IRIBeta/als/example/globus_reconstruction.py"
+
+    # iri_als_bl832_rundir = "/eagle/IRI-ALS-832/data/raw"
+    # iri_als_bl832_recon_script = "/eagle/IRI-ALS-832/scripts/globus_reconstruction.py"
+
+    function_inputs = {
+        "rundir": iribeta_rundir,
+        "script_path": iribeta_recon_script,
+        "h5_file_name": file_name,
+        "folder_path": folder_name
+    }
 
     # Define the json flow
     # class FlowInput(BaseModel):
@@ -325,7 +332,7 @@ def alcf_tomopy_reconstruction_flow(
             },
             "recursive_tx": True,
             "compute_endpoint_id": polaris_endpoint_id.get(),
-            "compute_function_id": reconstruction_func.get(),
+            "compute_function_id": reconstruction_func,
             "compute_function_kwargs": function_inputs
         }
     }
@@ -333,17 +340,17 @@ def alcf_tomopy_reconstruction_flow(
     collection_ids = [flow_input["input"]["source"]["id"], flow_input["input"]["destination"]["id"]]
 
     # Flow ID (only generate once!)
-    flow_id = Secret.load("globus-reconstruction-flow-id")
+    flow_id = JSON.load("globus-reconstruction-flow-id").value["flow_id"]
 
-    logger.info(f"reconstruction_func: {reconstruction_func.get()}")
-    logger.info(f"flow_id: {flow_id.get()}")
+    logger.info(f"reconstruction_func: {reconstruction_func}")
+    logger.info(f"flow_id: {flow_id}")
 
     # Start the timer
     start_time = time.time()
 
     # Run the flow
     flow_client = get_flows_client()
-    specific_flow_client = get_specific_flow_client(flow_id.get(), collection_ids=collection_ids)
+    specific_flow_client = get_specific_flow_client(flow_id, collection_ids=collection_ids)
 
     success = False
 
@@ -418,10 +425,18 @@ def alcf_tiff_to_zarr_flow(
     source_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
     destination_collection_endpoint = Secret.load("globus-iribeta-cgs-endpoint")
 
-    function_inputs = {"rundir": "/eagle/IRIBeta/als/bl832/raw",
-                       "recon_path": tiff_scratch_path,
-                       "raw_path": raw_path
-                       }
+    iribeta_rundir = "/eagle/IRIBeta/als/bl832/raw"
+    iribeta_conversion_script = "/eagle/IRIBeta/als/example/tiff_to_zarr.py"
+
+    # iri_als_bl832_rundir = "/eagle/IRI-ALS-832/data/raw"
+    # iri_als_bl832_conversion_script = "/eagle/IRI-ALS-832/scripts/tiff_to_zarr.py"
+
+    function_inputs = {
+        "rundir": iribeta_rundir,
+        "script_path": iribeta_conversion_script,
+        "recon_path": tiff_scratch_path,
+        "raw_path": raw_path
+    }
 
     # Define the json flow
     # class FlowInput(BaseModel):

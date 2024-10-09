@@ -1,6 +1,12 @@
 export $(grep -v '^#' .env | xargs)
 
 
+# create 'alfc_flow_pool'
+prefect work-pool create 'alcf_flow_pool'
+# create 'aclf_prune_pool'
+prefect work-pool create 'alcf_prune_pool'
+
+
 prefect deployment build ./orchestration/flows/bl832/alcf.py:process_new_832_ALCF_flow -n process_new_832_ALCF_flow -q bl832 -p alcf_flow_pool
 prefect deployment apply process_new_832_ALCF_flow-deployment.yaml
 
