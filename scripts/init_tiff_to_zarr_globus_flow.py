@@ -19,14 +19,18 @@ def get_polaris_endpoint_id() -> str:
 
 
 # def conversion_wrapper(rundir, h5_file_name, folder_path):
-def conversion_wrapper(rundir, recon_path, raw_path):
+def conversion_wrapper(rundir="/eagle/IRI-ALS-832/data/raw",
+                       script_path="/eagle/IRI-ALS-832/scripts/tiff_to_zarr.py",
+                       recon_path=None,
+                       raw_path=None) -> str:
     """
     Python function that wraps around the application call for Tomopy reconstruction on ALCF
 
     Args:
         rundir (str): the directory on the eagle file system (ALCF) where the input data are located
-        parametersfile (str, optional): Defaults to "inputOneSliceOfEach.txt", which is already on ALCF
-
+        script_path (str): the path to the script that will convert the tiff files to zarr
+        recon_path (str): the path to the reconstructed data
+        raw_path (str): the path to the raw data
     Returns:
         str: confirmation message regarding reconstruction and time to completion
     """
@@ -37,7 +41,7 @@ def conversion_wrapper(rundir, recon_path, raw_path):
     os.chdir(rundir)
 
     # Convert tiff files to zarr
-    command = (f"python /eagle/IRIBeta/als/example/tiff_to_zarr.py {recon_path} --raw_directory {raw_path}")
+    command = (f"python {script_path} {recon_path} --raw_directory {raw_path}")
     zarr_res = subprocess.run(command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     return (
@@ -45,7 +49,7 @@ def conversion_wrapper(rundir, recon_path, raw_path):
     )
 
 
-def create_flow_definition():
+def create_flow_definition() -> dict:
     flow_definition = {
         "Comment": "Run Tiff to Zarr conversion",
         "StartAt": "TiffToZarr",
@@ -68,8 +72,8 @@ def create_flow_definition():
     return flow_definition
 
 
-@task(name="update_flow_in_prefect")
-def update_flow_in_prefect(conversion_func: str, flow_id: str) -> None:
+@task(name="update_tiff_to_zarr_flow_in_prefect")
+def update_tiff_to_zarr_flow_in_prefect(conversion_func: str, flow_id: str) -> None:
     # Create JSON block with flow_id
     flow_json = JSON(value={"flow_id": flow_id})
     flow_json.save(name="globus-tiff-to-zarr-flow-id", overwrite=True)
@@ -100,7 +104,7 @@ def setup_tiff_to_zarr_flow() -> None:
     logger.info(f"Registered function UUID: {conversion_func}")
     logger.info(f"Flow UUID: {flow_id}")
 
-    update_flow_in_prefect(conversion_func, flow_id)
+    update_tiff_to_zarr_flow_in_prefect(conversion_func, flow_id)
 
 
 if __name__ == "__main__":
