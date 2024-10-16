@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 import warnings
@@ -43,6 +44,13 @@ def prefect_test_fixture():
 
         pruning_config = JSON(value={"max_wait_seconds": 600})
         pruning_config.save(name="pruning-config")
+
+        decision_settings = JSON(value={
+            "new_832_ALCF_flow/process_new_832_ALCF_flow": True,
+            "nersc_recon/nersc_recon": False,  # This is a placeholder for the NERSC reconstruction flow
+            "new_832_file_flow/new_file_832": True
+        })
+        decision_settings.save(name="decision-settings")
         yield
 
 
@@ -181,6 +189,54 @@ class MockSpecificFlowClient:
     def get_run(self, run_id: UUID) -> Dict[str, Any]:
         """Mock method for getting a run"""
         return self.runs.get(run_id, {})
+
+
+def test_832_decision_flow(mocker: MockFixture):
+    """Test 832 uber decision flow."""
+
+    # Mock the Secret block load using a simple manual mock class
+    class MockSecret:
+        value = str(uuid4())
+
+    mocker.patch('prefect.blocks.system.Secret.load', return_value=MockSecret())
+
+    # Import decision flow after mocking the necessary components
+    from orchestration.flows.bl832.decision_flow import decision_flow
+
+    # Mock read_deployment_by_name with a manually defined mock class
+    class MockDeployment:
+        version = "1.0.0"
+        flow_id = str(uuid4())
+        name = "test_deployment"
+
+    mocker.patch('prefect.client.orchestration.PrefectClient.read_deployment_by_name',
+                 return_value=MockDeployment())
+
+    # Mock run_deployment to avoid executing any Prefect workflows
+    async def mock_run_deployment(*args, **kwargs):
+        return None
+
+    mocker.patch('prefect.deployments.deployments.run_deployment', new=mock_run_deployment)
+
+    # Mock asyncio.gather to avoid actual async task execution
+    async def mock_gather(*args, **kwargs):
+        return [None]
+
+    mocker.patch('asyncio.gather', new=mock_gather)
+
+    # Run the decision flow
+    result = asyncio.run(decision_flow(
+        file_path="/global/raw/transfer_tests/test.txt",
+        is_export_control=False,
+        send_to_nersc=True,
+        config=MockConfig832(),
+        send_to_alcf=True,
+        folder_name="test_folder",
+        file_name="test_file"
+    ))
+
+    # Ensure the flow runs without throwing an error
+    assert result is None, "The decision flow did not complete successfully."
 
 
 def test_process_new_832_file(mocker: MockFixture):
