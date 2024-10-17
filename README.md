@@ -15,7 +15,7 @@ $   pip3 install -e .
 
 ###  Provide Prefect and Globus authentication in `.env`:
 
-Use `.env-example` as a template.
+Use `.env.example` as a template.
 
 ```
 GLOBUS_CLIENT_ID=<globus_client_id>
