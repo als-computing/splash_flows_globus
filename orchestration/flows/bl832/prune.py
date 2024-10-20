@@ -13,6 +13,7 @@ def prune_files(
     relative_path: str,
     source_endpoint: GlobusEndpoint,
     check_endpoint: GlobusEndpoint = None,
+    config=None
 ):
     """
     Prune files from a source endpoint.
@@ -23,7 +24,9 @@ def prune_files(
         check_endpoint (GlobusEndpoint, optional): The Globus target endpoint to check. Defaults to None.
     """
     p_logger = get_run_logger()
-    config = Config832()
+    if config is None:
+        config = Config832()
+
     globus_settings = JSON.load("globus-settings").value
     max_wait_seconds = globus_settings["max_wait_seconds"]
     flow_name = f"prune_from_{source_endpoint.name}"
@@ -41,52 +44,102 @@ def prune_files(
 
 
 @flow(name="prune_spot832")
-def prune_spot832(relative_path: str):
-    prune_files(relative_path=relative_path,
-                source_endpoint=Config832().spot832,
-                check_endpoint=Config832().data832)
+def prune_spot832(
+        relative_path: str,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: GlobusEndpoint,
+        config=None,
+):
+    prune_files(
+        relative_path=relative_path,
+        source_endpoint=source_endpoint,
+        check_endpoint=check_endpoint,
+        config=config
+    )
 
 
 @flow(name="prune_data832")
-def prune_data832(relative_path: str):
-    prune_files(relative_path=relative_path,
-                source_endpoint=Config832().data832,
-                check_endpoint=Config832().nersc832)
+def prune_data832(
+        relative_path: str,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: GlobusEndpoint,
+        config=None,
+):
+    prune_files(
+        relative_path=relative_path,
+        source_endpoint=source_endpoint,
+        check_endpoint=check_endpoint,
+        config=config)
 
 
 @flow(name="prune_data832_raw")
-def prune_data832_raw(relative_path: str):
-    prune_files(relative_path=relative_path,
-                source_endpoint=Config832().data832_raw,
-                check_endpoint=None)
+def prune_data832_raw(
+        relative_path: str,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: GlobusEndpoint,
+        config=None,
+):
+    prune_files(
+        relative_path=relative_path,
+        source_endpoint=source_endpoint,
+        check_endpoint=check_endpoint,
+        config=config)
 
 
 @flow(name="prune_data832_scratch")
-def prune_data832_scratch(relative_path: str):
-    prune_files(relative_path=relative_path,
-                source_endpoint=Config832().data832_scratch,
-                check_endpoint=None)
+def prune_data832_scratch(
+        relative_path: str,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: GlobusEndpoint,
+        config=None,
+):
+    prune_files(
+        relative_path=relative_path,
+        source_endpoint=source_endpoint,
+        check_endpoint=check_endpoint,
+        config=config)
 
 
 @flow(name="prune_alcf832_raw")
-def prune_alcf832_raw(relative_path: str):
-    prune_files(relative_path=relative_path,
-                source_endpoint=Config832().alcf832_raw,
-                check_endpoint=Config832().data832_raw)
+def prune_alcf832_raw(
+        relative_path: str,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: GlobusEndpoint,
+        config=None,
+):
+    prune_files(
+        relative_path=relative_path,
+        source_endpoint=source_endpoint,
+        check_endpoint=check_endpoint,
+        config=config)
 
 
 @flow(name="prune_alcf832_scratch")
-def prune_alcf832_scratch(relative_path: str):
-    prune_files(relative_path=relative_path,
-                source_endpoint=Config832().alcf832_scratch,
-                check_endpoint=Config832().data832_scratch)
+def prune_alcf832_scratch(
+        relative_path: str,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: GlobusEndpoint,
+        config=None,
+):
+    prune_files(
+        relative_path=relative_path,
+        source_endpoint=source_endpoint,
+        check_endpoint=check_endpoint,
+        config=config)
 
 
 @flow(name="prune_nersc832_alsdev_scratch")
-def prune_nersc832_alsdev_scratch(relative_path: str):
-    prune_files(relative_path=relative_path,
-                source_endpoint=Config832().nersc832_alsdev_scratch,
-                check_endpoint=None)
+def prune_nersc832_alsdev_scratch(
+        relative_path: str,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: GlobusEndpoint,
+        config=None,
+):
+    prune_files(
+        relative_path=relative_path,
+        source_endpoint=source_endpoint,
+        check_endpoint=check_endpoint,
+        config=config)
 
 
 if __name__ == "__main__":

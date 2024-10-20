@@ -368,7 +368,8 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
         data832_raw_path=alcf_raw_path,
         data832_scratch_path_tiff=f"{scratch_path_tiff}",
         data832_scratch_path_zarr=f"{scratch_path_zarr}",
-        one_minute=True
+        one_minute=True,
+        config=mock_config
     )
     assert isinstance(result, list), "Result should be a list"
     assert result == [True, True, True, True, True], "Result does not match expected values"
