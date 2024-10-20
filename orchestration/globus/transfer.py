@@ -12,8 +12,7 @@ from globus_sdk import (
     ConfidentialAppAuthClient,
     DeleteData,
     TransferClient,
-    TransferData,
-    GlobusAPIError
+    TransferData
 )
 from prefect import task, get_run_logger
 from prefect.blocks.system import Secret
@@ -189,44 +188,24 @@ def prune_files(
     logger=logger,
 ):
     start_time = time()
-    print("transfer_client", transfer_client)
-    print("endpoint", endpoint)
-    print("endpoint.uuid", endpoint.uuid)
-    print("files", files)
 
-    try:
-        ddata = DeleteData(transfer_client=transfer_client, endpoint=endpoint.uuid, recursive=True)
-        logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
-        for file in files:
-            logger.info(f"deleting {file}")
-            print(file)
-            file_path = endpoint.full_path(file)
-            # print("{endpoint.root_path}/{file}")
-            ddata.add_item(file_path)
-        delete_result = transfer_client.submit_delete(ddata)
-        task_id = delete_result["task_id"]
-        print("delete_result", delete_result)
-        print("task_id", task_id)
-        # task_wait(
-        #     transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
-        # )
-        print("deleted")
-        logger.info(f"delete_result {delete_result}")
-    except GlobusAPIError as err:
-        logger.error(f"Error removing directory {files} in endpoint {endpoint.uri}: {err.message}")
-        if err.info.consent_required:
-            logger.error(f"Got a ConsentRequired error with scopes: {err.info.consent_required.required_scopes}")
-        elif err.code == "PermissionDenied":
-            logger.error(f"Permission denied for removing directory {files}. Ensure proper permissions are set.")
-        elif err.http_status == 500:
-            logger.error(f"Server error when removing directory {files} in endpoint {endpoint.uri}.")
-        else:
-            logger.error(f"An unexpected error occurred: {err}")
-
-    finally:
-        elapsed_time = time() - start_time
-        logger.info(f"prune_files task took {elapsed_time:.2f} seconds")
-        return task_id
+    ddata = DeleteData(transfer_client=transfer_client, endpoint=endpoint.uuid, recursive=True)
+    logger.info(f"deleting {len(files)} from endpoint: {endpoint.uri}")
+    for file in files:
+        logger.info(f"deleting {file}")
+        print(file)
+        file_path = endpoint.full_path(file)
+        # print("{endpoint.root_path}/{file}")
+        ddata.add_item(file_path)
+    delete_result = transfer_client.submit_delete(ddata)
+    task_id = delete_result["task_id"]
+    task_wait(
+        transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
+    )
+    logger.info(f"delete_result {delete_result}")
+    elapsed_time = time() - start_time
+    logger.info(f"prune_files task took {elapsed_time:.2f} seconds")
+    return task_id
 
 
 def rename(

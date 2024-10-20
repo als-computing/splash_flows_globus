@@ -12,17 +12,17 @@ logger = logging.getLogger("orchestration.prefect")
 
 
 async def schedule(
-    deploymnent_name,
+    deployment_name,
     flow_run_name,
     parameters,
     duration_from_now: datetime.timedelta,
     logger=logger,
 ):
     async with get_client() as client:
-        deployment = await client.read_deployment_by_name(deploymnent_name)
+        deployment = await client.read_deployment_by_name(deployment_name)
         assert (
             deployment
-        ), f"No deployment found in config for deploymnent_name {deploymnent_name}"
+        ), f"No deployment found in config for deployment_name {deployment_name}"
         timezone = pytz.timezone("America/Los_Angeles")  # Adjust the timezone as needed
         now = datetime.datetime.now(timezone)
         date_time_tz = now + duration_from_now
@@ -37,11 +37,11 @@ async def schedule(
 
 @task(name="Schedule Prefect Flow")
 def schedule_prefect_flow(
-    deploymnent_name, flow_run_name, parameters, duration_from_now: datetime.timedelta
+    deployment_name, flow_run_name, parameters, duration_from_now: datetime.timedelta
 ):
     logger = get_run_logger()
     asyncio.run(
-        schedule(deploymnent_name, flow_run_name, parameters, duration_from_now, logger)
+        schedule(deployment_name, flow_run_name, parameters, duration_from_now, logger)
     )
     return
 

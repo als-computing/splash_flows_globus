@@ -140,7 +140,12 @@ def process_new_832_file(file_path: str,
     schedule_prefect_flow(
         "prune_spot832/prune_spot832",
         flow_name,
-        {"relative_path": relative_path},
+        {
+            "relative_path": relative_path,
+            "source_endpoint": config.spot832,
+            "check_endpoint": config.data832,
+         },
+
         datetime.timedelta(days=schedule_spot832_delete_days),
     )
     logger.info(
@@ -151,7 +156,11 @@ def process_new_832_file(file_path: str,
     schedule_prefect_flow(
         "prune_data832/prune_data832",
         flow_name,
-        {"relative_path": relative_path},
+        {
+            "relative_path": relative_path,
+            "source_endpoint": config.data832,
+            "check_endpoint": config.nersc832,
+        },
         datetime.timedelta(days=schedule_data832_delete_days),
     )
     logger.info(

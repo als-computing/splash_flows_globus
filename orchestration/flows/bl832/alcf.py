@@ -180,7 +180,11 @@ def transfer_data_to_data832(
 
 
 @task(name="schedule_prune_task")
-def schedule_prune_task(path: str, location: str, schedule_days: datetime.timedelta) -> bool:
+def schedule_prune_task(path: str,
+                        location: str,
+                        schedule_days: datetime.timedelta,
+                        source_endpoint=None,
+                        check_endpoint=None) -> bool:
     """
     Schedules a Prefect flow to prune files from a specified location.
 
@@ -192,9 +196,13 @@ def schedule_prune_task(path: str, location: str, schedule_days: datetime.timede
     try:
         flow_name = f"delete {location}: {Path(path).name}"
         schedule_prefect_flow(
-            deploymnent_name=f"prune_{location}/prune_{location}",
+            deployment_name=f"prune_{location}/prune_{location}",
             flow_run_name=flow_name,
-            parameters={"relative_path": path},
+            parameters={
+                "relative_path": path,
+                "source_endpoint": source_endpoint,
+                "check_endpoint": check_endpoint
+            },
             duration_from_now=schedule_days
         )
         return True
@@ -214,7 +222,8 @@ def schedule_pruning(
         data832_raw_path: str = None,
         data832_scratch_path_tiff: str = None,
         data832_scratch_path_zarr: str = None,
-        one_minute: bool = False) -> bool:
+        one_minute: bool = False,
+        config=None) -> bool:
     """
     This function schedules the deletion of files from specified locations on ALCF, NERSC, and data832.
 
@@ -240,21 +249,21 @@ def schedule_pruning(
         nersc_delay = datetime.timedelta(days=pruning_config["delete_nersc832_files_after_days"])
         data832_delay = datetime.timedelta(days=pruning_config["delete_data832_files_after_days"])
 
-    # (path, location, days)
+    # (path, location, days, source_endpoint, check_endpoint)
     delete_schedules = [
-        (alcf_raw_path, "alcf832_raw", alcf_delay),
-        (alcf_scratch_path_tiff, "alcf832_scratch", alcf_delay),
-        (alcf_scratch_path_zarr, "alcf832_scratch", alcf_delay),
-        (nersc_scratch_path_tiff, "nersc832_alsdev_scratch", nersc_delay),
-        (nersc_scratch_path_zarr, "nersc832_alsdev_scratch", nersc_delay),
-        (data832_raw_path, "data832_raw", data832_delay),
-        (data832_scratch_path_tiff, "data832_scratch", data832_delay),
-        (data832_scratch_path_zarr, "data832_scratch", data832_delay)
+        (alcf_raw_path, "alcf832_raw", alcf_delay, config.alcf832_raw, config.data832_raw),
+        (alcf_scratch_path_tiff, "alcf832_scratch", alcf_delay, config.alcf832_scratch, config.data832_scratch),
+        (alcf_scratch_path_zarr, "alcf832_scratch", alcf_delay, config.alcf832_scratch, config.data832_scratch),
+        (nersc_scratch_path_tiff, "nersc832_alsdev_scratch", nersc_delay, config.nersc832_alsdev_scratch, None),
+        (nersc_scratch_path_zarr, "nersc832_alsdev_scratch", nersc_delay, config.nersc832_alsdev_scratch, None),
+        (data832_raw_path, "data832_raw", data832_delay, config.data832_raw, None),
+        (data832_scratch_path_tiff, "data832_scratch", data832_delay, config.data832_scratch, None),
+        (data832_scratch_path_zarr, "data832_scratch", data832_delay, config.data832_scratch, None)
     ]
 
-    for path, location, days in delete_schedules:
+    for path, location, days, source_endpoint, check_endpoint in delete_schedules:
         if path:
-            schedule_prune_task(path, location, days)
+            schedule_prune_task(path, location, days, source_endpoint, check_endpoint)
             logger.info(f"Scheduled delete from {location} at {days} days")
         else:
             logger.info(f"Path not provided for {location}, skipping scheduling of deletion task.")
@@ -570,55 +579,66 @@ def process_new_832_ALCF_flow(folder_name: str,
         logger.info(f"Transfer status: {alcf_transfer_success}")
         if not alcf_transfer_success:
             logger.error("Transfer failed due to configuration or authorization issues.")
+            raise ValueError("Transfer to ALCF Failed")
         else:
-            logger.info("Transfer successful.")
+            logger.info("Transfer to ALCF Successful.")
 
-        # Step 2A: Run the Tomopy Reconstruction Globus Flow
-        logger.info(f"Running Tomopy reconstruction on {file_name} at ALCF")
-        alcf_reconstruction_success = alcf_tomopy_reconstruction_flow(raw_path=alcf_raw_path,
-                                                                      scratch_path=alcf_scratch_path,
-                                                                      folder_name=folder_name,
-                                                                      file_name=h5_file_name)
-        if not alcf_reconstruction_success:
-            logger.error("Reconstruction Failed.")
-        else:
-            logger.info("Reconstruction Successful.")
+            # Step 2A: Run the Tomopy Reconstruction Globus Flow
+            logger.info(f"Running Tomopy reconstruction on {file_name} at ALCF")
+            alcf_reconstruction_success = alcf_tomopy_reconstruction_flow(
+                raw_path=alcf_raw_path,
+                scratch_path=alcf_scratch_path,
+                folder_name=folder_name,
+                file_name=h5_file_name)
+            if not alcf_reconstruction_success:
+                logger.error("Reconstruction Failed.")
+                raise ValueError("Reconstruction at ALCF Failed")
+            else:
+                logger.info("Reconstruction Successful.")
 
-        # Step 2B: Run the Tiff to Zarr Globus Flow
-        logger.info(f"Running Tiff to Zarr on {file_name} at ALCF")
-        raw_path = f"/eagle/IRIBeta/als/{alcf_raw_path}/{h5_file_name}"
-        tiff_scratch_path = f"/eagle/IRIBeta/als/bl832/scratch/{folder_name}/rec{file_name}/"
-        alcf_tiff_to_zarr_success = alcf_tiff_to_zarr_flow(raw_path=raw_path,
-                                                           tiff_scratch_path=tiff_scratch_path)
-        if not alcf_tiff_to_zarr_success:
-            logger.error("Tiff to Zarr Failed.")
-        else:
-            logger.info("Tiff to Zarr Successful.")
+                # Step 2B: Run the Tiff to Zarr Globus Flow
+                logger.info(f"Running Tiff to Zarr on {file_name} at ALCF")
+                raw_path = f"/eagle/IRIBeta/als/{alcf_raw_path}/{h5_file_name}"
+                tiff_scratch_path = f"/eagle/IRIBeta/als/bl832/scratch/{folder_name}/rec{file_name}/"
+                alcf_tiff_to_zarr_success = alcf_tiff_to_zarr_flow(
+                    raw_path=raw_path,
+                    tiff_scratch_path=tiff_scratch_path)
+                if not alcf_tiff_to_zarr_success:
+                    logger.error("Tiff to Zarr Failed.")
+                    raise ValueError("Tiff to Zarr at ALCF Failed")
+                else:
+                    logger.info("Tiff to Zarr Successful.")
 
-        # Step 3: Send reconstructed data (tiffs and zarr) to data832
-        # Transfer A: Send reconstructed data (tiff) to data832
-        logger.info(f"Transferring {file_name} from {alcf_raw_path} at ALCF to {data832_scratch_path} at data832")
-        logger.info(f"Reconstructed file path: {scratch_path_tiff}")
-        data832_tiff_transfer_success = transfer_data_to_data832(scratch_path_tiff,
-                                                                 config.tc,
-                                                                 config.alcf832_scratch,
-                                                                 config.data832_scratch)
-        if not data832_tiff_transfer_success:
-            logger.error("Transfer failed due to configuration or authorization issues.")
-        else:
-            logger.info("Transfer successful.")
+        if alcf_reconstruction_success:
+            # Step 3: Send reconstructed data (tiffs and zarr) to data832
+            # Transfer A: Send reconstructed data (tiff) to data832
+            logger.info(f"Transferring {file_name} from {alcf_raw_path} "
+                        f"at ALCF to {data832_scratch_path} at data832")
+            logger.info(f"Reconstructed file path: {scratch_path_tiff}")
+            data832_tiff_transfer_success = transfer_data_to_data832(
+                scratch_path_tiff,
+                config.tc,
+                config.alcf832_scratch,
+                config.data832_scratch)
+            if not data832_tiff_transfer_success:
+                logger.error("Transfer failed due to configuration or authorization issues.")
+            else:
+                logger.info("Transfer successful.")
 
-        # Transfer B: Send reconstructed data (zarr) to data832
-        logger.info(f"Transferring {file_name} from {alcf_raw_path} at ALCF to {data832_scratch_path} at data832")
-        logger.info(f"Reconstructed file path: {scratch_path_zarr}")
-        data832_zarr_transfer_success = transfer_data_to_data832(scratch_path_zarr,
-                                                                 config.tc,
-                                                                 config.alcf832_scratch,
-                                                                 config.data832_scratch)
-        if not data832_zarr_transfer_success:
-            logger.error("Transfer failed due to configuration or authorization issues.")
-        else:
-            logger.info("Transfer successful.")
+        if alcf_tiff_to_zarr_success:
+            # Transfer B: Send reconstructed data (zarr) to data832
+            logger.info(f"Transferring {file_name} from {alcf_raw_path} "
+                        f"at ALCF to {data832_scratch_path} at data832")
+            logger.info(f"Reconstructed file path: {scratch_path_zarr}")
+            data832_zarr_transfer_success = transfer_data_to_data832(
+                scratch_path_zarr,
+                config.tc,
+                config.alcf832_scratch,
+                config.data832_scratch)
+            if not data832_zarr_transfer_success:
+                logger.error("Transfer failed due to configuration or authorization issues.")
+            else:
+                logger.info("Transfer successful.")
 
         # Step 4: Schedule deletion of files from ALCF, NERSC, and data832
         logger.info("Scheduling deletion of files from ALCF, NERSC, and data832")
@@ -633,7 +653,8 @@ def process_new_832_ALCF_flow(folder_name: str,
             data832_raw_path=f"{folder_name}/{h5_file_name}" if alcf_transfer_success else None,
             data832_scratch_path_tiff=f"{scratch_path_tiff}" if data832_tiff_transfer_success else None,
             data832_scratch_path_zarr=f"{scratch_path_zarr}" if data832_zarr_transfer_success else None,
-            one_minute=True  # Set to False for production durations
+            one_minute=True,  # Set to False for production durations
+            config=config
         )
 
         # Step 5: ingest into scicat ... todo

@@ -219,7 +219,6 @@ def check_globus_transfer_permissions(endpoint_id: str,
 
 @app.command()
 def main(endpoint_id: str,
-         transfer_client: Optional[globus_sdk.TransferClient],
          list_contents: bool = True,
          create_test_directory: bool = True,
          delete_test_directory: bool = True,
