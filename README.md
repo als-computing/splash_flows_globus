@@ -26,7 +26,7 @@ PREFECT_API_KEY=<prefect_client_secret>
 
 ## General configuration
 
-### Define your Globus collection endpoints in `config.yml`:
+### Globus collection endpoints are defined in `config.yml`:
 
 ```
 globus:
@@ -37,14 +37,18 @@ globus:
       uuid: 44ae904c-ab64-4145-a8f0-7287de38324d
 ```
 
-### Create a Prefect deployment workflow `create_deployments.sh` file:
+### Prefect workflows are deployed using the `create_deployments_[name].sh` scripts.
+
+These are meant to be run on `flow-prd`, in `bl832_agent` with properly set `.env` variables (i.e. prefect id/secret, globus id/secret, ..)
+
+General anatomy of a file:
 
 ```
 prefect deployment build <path_of_file>:<prefect_function> -n 'name_of_the_workflow' -q <tag>
 prefect deployment apply <prefect_function>-deployment.yaml
 ```
 
-The following example creates a Prefect workflow for the function of `process_new_file` in file of `./orchestration/flows/bl7012/move.py`
+Example:  The following creates a Prefect workflow for the function of `process_new_file` in file of `./orchestration/flows/bl7012/move.py`
 
 ```
 prefect deployment build ./orchestration/flows/bl7012/move.py:process_new_file -n 'process_newdata7012' -q bl7012
