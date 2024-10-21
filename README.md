@@ -24,7 +24,25 @@ PREFECT_API_URL=<url_of_prefect_server>
 PREFECT_API_KEY=<prefect_client_secret>
 ```
 
-## General configuration
+## Current workflow overview and status:
+
+| Name                         | Description                                                                         |  Status  | Notes |
+|------------------------------|-------------------------------------------------------------------------------------|:--------:|-------|
+| `move.py`                    | Move data from spot832 to data832, schedule pruning, and ingest into scicat         | Deployed | [Details](./docs/bl832_ALCF.md) |
+| `prune.py`                   | Run data pruning flows as scheduled                                                 | Deployed |       |
+| `alcf.py`                    | Run tomography reconstruction Globus Compute Flows at ALCF                          | Deployed |       |
+| `nersc.py`                   | Run tomography reconstruction using SFAPI at NERSC                                  |    WIP   |       |
+| `dispatcher.py`                                 | Dispatch flow to control beamline subflows                                          |    WIP   |       |
+| `create_deployments_<bl>.sh`                    | Deploy functions as prefect flows. Run once, or after updating underlying flow code |          |       |
+| `globus/flows.py` and `globus/transfer.py`      | Connect Python with globus API – could use better error handling                    |          |       |
+| `scripts/check_globus_compute.py`               | Check if CC has access to compute endpoint and if it is available                   |          |       |
+| `scripts/check_globus_transfer.py`              | Check if CC has r/w/d access to an endpoint. Also ability to delete data            |          |       |
+| `source scripts/login_to_globus_and_prefect.py` | Login to globus/prefect in current terminal from .env file                          |          |       |
+| `init_<data_task>_globus_flow.py`               | Register and update globus flow UUIDs in Prefect                                    |          |       |
+| `init_<data_task>_globus_flow.py`               | Register and update globus flow UUIDs in Prefect                                    |          |       |
+| `orchestration/tests/<pytest_scripts>.py`       | Test scripts using pytest                                                           |          |       |
+
+## Further development
 
 ### Globus collection endpoints are defined in `config.yml`:
 
