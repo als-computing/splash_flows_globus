@@ -243,7 +243,12 @@ def task_wait(
 
         if task["nice_status"] in ["FILE_NOT_FOUND"]:
             transfer_client.cancel_task(task_id)
-            raise TransferError("Received FILE_NOT_FOUND, cancelling task")
+            raise TransferError(f"Received FILE_NOT_FOUND, cancelling Globus task {task_id}")
+
+        if task["nice_status"] in ["PERMISSION_DENIED"]:
+            transfer_client.cancel_task(task_id)
+            raise TransferError(f"Received PERMISSION_DENIED, cancelling Globus task {task_id}")
+
     return True
 
 
