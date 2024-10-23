@@ -5,7 +5,7 @@ import logging
 import os
 from pathlib import Path
 from time import time
-from typing import Dict, List
+from typing import Dict, List, Union
 from dotenv import load_dotenv
 from globus_sdk import (
     ClientCredentialsAuthorizer,
@@ -257,7 +257,7 @@ def prune_one_safe(
     if_older_than_days: int,
     tranfer_client: TransferClient,
     source_endpoint: GlobusEndpoint,
-    check_endpoint: GlobusEndpoint,
+    check_endpoint: Union[GlobusEndpoint, None],
     max_wait_seconds: int = 120,
     logger=logger,
 ):

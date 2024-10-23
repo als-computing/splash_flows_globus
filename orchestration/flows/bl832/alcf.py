@@ -643,6 +643,11 @@ def process_new_832_ALCF_flow(folder_name: str,
         # Step 4: Schedule deletion of files from ALCF, NERSC, and data832
         logger.info("Scheduling deletion of files from ALCF, NERSC, and data832")
         nersc_transfer_success = False
+        # alcf_transfer_success = True
+        # alcf_reconstruction_success = True
+        # alcf_tiff_to_zarr_success = True
+        # data832_tiff_transfer_success = True
+        # data832_zarr_transfer_success = True
 
         schedule_pruning(
             alcf_raw_path=f"{folder_name}/{h5_file_name}" if alcf_transfer_success else None,

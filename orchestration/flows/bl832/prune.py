@@ -1,6 +1,7 @@
 import logging
 from prefect import flow, get_run_logger
 from prefect.blocks.system import JSON
+from typing import Union
 
 from orchestration.flows.bl832.config import Config832
 from orchestration.globus.transfer import GlobusEndpoint, prune_one_safe
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 def prune_files(
     relative_path: str,
     source_endpoint: GlobusEndpoint,
-    check_endpoint: GlobusEndpoint = None,
+    check_endpoint: Union[GlobusEndpoint, None] = None,
     config=None
 ):
     """
@@ -47,7 +48,7 @@ def prune_files(
 def prune_spot832(
         relative_path: str,
         source_endpoint: GlobusEndpoint,
-        check_endpoint: GlobusEndpoint,
+        check_endpoint: Union[GlobusEndpoint, None] = None,
         config=None,
 ):
     prune_files(
@@ -62,7 +63,7 @@ def prune_spot832(
 def prune_data832(
         relative_path: str,
         source_endpoint: GlobusEndpoint,
-        check_endpoint: GlobusEndpoint,
+        check_endpoint: Union[GlobusEndpoint, None] = None,
         config=None,
 ):
     prune_files(
@@ -76,7 +77,7 @@ def prune_data832(
 def prune_data832_raw(
         relative_path: str,
         source_endpoint: GlobusEndpoint,
-        check_endpoint: GlobusEndpoint,
+        check_endpoint: Union[GlobusEndpoint, None] = None,
         config=None,
 ):
     prune_files(
@@ -90,7 +91,7 @@ def prune_data832_raw(
 def prune_data832_scratch(
         relative_path: str,
         source_endpoint: GlobusEndpoint,
-        check_endpoint: GlobusEndpoint,
+        check_endpoint: Union[GlobusEndpoint, None] = None,
         config=None,
 ):
     prune_files(
@@ -104,7 +105,7 @@ def prune_data832_scratch(
 def prune_alcf832_raw(
         relative_path: str,
         source_endpoint: GlobusEndpoint,
-        check_endpoint: GlobusEndpoint,
+        check_endpoint: Union[GlobusEndpoint, None] = None,
         config=None,
 ):
     prune_files(
@@ -118,7 +119,7 @@ def prune_alcf832_raw(
 def prune_alcf832_scratch(
         relative_path: str,
         source_endpoint: GlobusEndpoint,
-        check_endpoint: GlobusEndpoint,
+        check_endpoint: Union[GlobusEndpoint, None] = None,
         config=None,
 ):
     prune_files(
@@ -132,7 +133,7 @@ def prune_alcf832_scratch(
 def prune_nersc832_alsdev_scratch(
         relative_path: str,
         source_endpoint: GlobusEndpoint,
-        check_endpoint: GlobusEndpoint,
+        check_endpoint: Union[GlobusEndpoint, None] = None,
         config=None,
 ):
     prune_files(
