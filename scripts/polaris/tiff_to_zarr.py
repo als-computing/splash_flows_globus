@@ -63,7 +63,7 @@ def main():
         last_part = os.path.basename(os.path.normpath(tiff_dir))
         zarr_dir = os.path.abspath(os.path.join(tiff_dir, '..', last_part + '.zarr'))
     if not os.path.exists(zarr_dir):
-        os.makedirs(zarr_dir)
+        os.makedirs(zarr_dir, mode=0o2775, exist_ok=True)
 
     print('Output directory: ' + zarr_dir)
 
@@ -79,6 +79,10 @@ def main():
 
     # Set permissions for the output directory and its contents
     set_permissions_recursive(zarr_dir)
+
+    # Extract and set permissions for the parent directory (folder_name)
+    parent_dir = os.path.abspath(os.path.join(tiff_dir, '../'))  # Extract parent directory
+    set_permissions_recursive(parent_dir)  # Set permissions for parent directory
 
 
 if __name__ == "__main__":

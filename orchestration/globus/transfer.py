@@ -5,7 +5,7 @@ import logging
 import os
 from pathlib import Path
 from time import time
-from typing import Dict, List
+from typing import Dict, List, Union
 from dotenv import load_dotenv
 from globus_sdk import (
     ClientCredentialsAuthorizer,
@@ -243,7 +243,12 @@ def task_wait(
 
         if task["nice_status"] in ["FILE_NOT_FOUND"]:
             transfer_client.cancel_task(task_id)
-            raise TransferError("Received FILE_NOT_FOUND, cancelling task")
+            raise TransferError(f"Received FILE_NOT_FOUND, cancelling Globus task {task_id}")
+
+        if task["nice_status"] in ["PERMISSION_DENIED"]:
+            transfer_client.cancel_task(task_id)
+            raise TransferError(f"Received PERMISSION_DENIED, cancelling Globus task {task_id}")
+
     return True
 
 
@@ -252,7 +257,7 @@ def prune_one_safe(
     if_older_than_days: int,
     tranfer_client: TransferClient,
     source_endpoint: GlobusEndpoint,
-    check_endpoint: GlobusEndpoint,
+    check_endpoint: Union[GlobusEndpoint, None],
     max_wait_seconds: int = 120,
     logger=logger,
 ):
