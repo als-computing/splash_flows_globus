@@ -61,7 +61,7 @@ class DecisionFlowInputModel(BaseModel):
 
 
 @task(name="setup_decision_settings")
-def setup_decision_settings(alcf_recon: bool, nersc_recon: bool, nersc_move: bool) -> dict:
+def setup_decision_settings(alcf_recon: bool, nersc_recon: bool, new_file_832: bool) -> dict:
     """
     This task is used to define the settings for the decision making process of the BL832 beamline.
 
@@ -73,12 +73,12 @@ def setup_decision_settings(alcf_recon: bool, nersc_recon: bool, nersc_move: boo
     logger = get_run_logger()
     try:
         logger.info(f"Setting up decision settings: alcf_recon={alcf_recon}, "
-                    f"nersc_recon={nersc_recon}, nersc_move={nersc_move}")
+                    f"nersc_recon={nersc_recon}, new_file_832={new_file_832}")
         # Define which flows to run based on the input settings
         settings = {
             "new_832_ALCF_flow/process_new_832_ALCF_flow": alcf_recon,
             "nersc_recon/nersc_recon": nersc_recon,  # This is a placeholder for the NERSC reconstruction flow
-            "new_832_file_flow/new_file_832": nersc_move
+            "new_832_file_flow/new_file_832": new_file_832
         }
         # Save the settings in a JSON block for later retrieval by other flows
         settings_json = JSON(value=settings)
@@ -107,8 +107,8 @@ async def run_specific_flow(flow_name: str, parameters: dict) -> None:
         raise
 
 
-@flow(name="decision_flow")
-async def decision_flow(
+@flow(name="dispatcher")
+async def dispatcher(
     file_path: str,
     is_export_control: bool,
     send_to_nersc: bool,
@@ -198,15 +198,16 @@ if __name__ == "__main__":
     """
     try:
         # Setup decision settings based on input parameters
-        setup_decision_settings(alcf_recon=True, nersc_recon=False, nersc_move=True)
+        setup_decision_settings(alcf_recon=True, nersc_recon=False, new_file_832=False)
         # Run the main decision flow with the specified parameters
-        asyncio.run(decision_flow(file_path="/path/to/file",
-                                  is_export_control=False,
-                                  send_to_nersc=True,
-                                  config={},
-                                  send_to_alcf=True,
-                                  folder_name="folder",
-                                  file_name="file"))
+        asyncio.run(dispatcher(
+            file_path="/path/to/file",
+            is_export_control=False,
+            send_to_nersc=True,
+            config={},
+            send_to_alcf=True,
+            folder_name="folder",
+            file_name="file"))
     except Exception as e:
         logger = get_run_logger()
         logger.error(f"Failed to execute main flow: {e}")
