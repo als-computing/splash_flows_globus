@@ -29,5 +29,5 @@ prefect deployment apply prune_data832-deployment.yaml
     # in docker-compose.yaml:
     # command: prefect agent start --pool "scicat_ingest_pool"
 
-prefect deployment build ./orchestration/flows/scicat/ingest.py:ingest_dataset -n ingest_dataset -p scicat_ingest_pool
+prefect deployment build ./orchestration/flows/scicat/ingest.py:ingest_dataset -n ingest_dataset -p scicat_ingest_pool -q ingest_dataset_queue
 prefect deployment apply ingest_dataset-deployment.yaml
