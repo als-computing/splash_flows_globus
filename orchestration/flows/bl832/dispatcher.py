@@ -2,8 +2,8 @@ import asyncio
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import JSON
 from prefect.deployments.deployments import run_deployment
-from pydantic import BaseModel, ValidationError
-from typing import Any, Union
+from pydantic import BaseModel, ValidationError, Field
+from typing import Any, Optional, Union
 
 
 class FlowParameterMapper:
@@ -12,7 +12,7 @@ class FlowParameterMapper:
     """
     flow_parameters = {
         # From alcf.py
-        "new_832_ALCF_flow/process_new_832_ALCF_flow": [
+        "alcf_recon_flow/alcf_recon_flow": [
             "folder_name",
             "file_name",
             "is_export_control",
@@ -51,17 +51,17 @@ class DecisionFlowInputModel(BaseModel):
     """
     Pydantic model to validate input parameters for the decision flow.
     """
-    file_path: str
-    is_export_control: bool
-    send_to_nersc: bool
-    config: Union[dict, Any]
-    send_to_alcf: bool
-    folder_name: str
-    file_name: str
+    file_path: Optional[str] = Field(default=None)
+    is_export_control: Optional[bool] = Field(default=False)
+    send_to_nersc: Optional[bool] = Field(default=False)
+    config: Optional[Union[dict, Any]] = Field(default_factory=dict)
+    send_to_alcf: Optional[bool] = Field(default=False)
+    folder_name: Optional[str] = Field(default=None)
+    file_name: Optional[str] = Field(default=None)
 
 
 @task(name="setup_decision_settings")
-def setup_decision_settings(alcf_recon: bool, nersc_recon: bool, nersc_move: bool) -> dict:
+def setup_decision_settings(alcf_recon: bool, nersc_recon: bool, new_file_832: bool) -> dict:
     """
     This task is used to define the settings for the decision making process of the BL832 beamline.
 
@@ -73,12 +73,12 @@ def setup_decision_settings(alcf_recon: bool, nersc_recon: bool, nersc_move: boo
     logger = get_run_logger()
     try:
         logger.info(f"Setting up decision settings: alcf_recon={alcf_recon}, "
-                    f"nersc_recon={nersc_recon}, nersc_move={nersc_move}")
+                    f"nersc_recon={nersc_recon}, new_file_832={new_file_832}")
         # Define which flows to run based on the input settings
         settings = {
-            "new_832_ALCF_flow/process_new_832_ALCF_flow": alcf_recon,
+            "alcf_recon_flow/alcf_recon_flow": alcf_recon,
             "nersc_recon/nersc_recon": nersc_recon,  # This is a placeholder for the NERSC reconstruction flow
-            "new_832_file_flow/new_file_832": nersc_move
+            "new_832_file_flow/new_file_832": new_file_832
         }
         # Save the settings in a JSON block for later retrieval by other flows
         settings_json = JSON(value=settings)
@@ -107,31 +107,21 @@ async def run_specific_flow(flow_name: str, parameters: dict) -> None:
         raise
 
 
-@flow(name="decision_flow")
-async def decision_flow(
-    file_path: str,
-    is_export_control: bool,
-    send_to_nersc: bool,
-    config: Union[dict, Any],
-    send_to_alcf: bool,
-    folder_name: str,
-    file_name: str
+@flow(name="dispatcher")
+async def dispatcher(
+    file_path: Optional[str] = None,
+    is_export_control: bool = False,
+    send_to_nersc: bool = False,
+    config: Optional[Union[dict, Any]] = None,
+    send_to_alcf: bool = False,
+    folder_name: Optional[str] = None,
+    file_name: Optional[str] = None
 ) -> None:
     """
-    This flow reads the decision settings and launches tasks accordingly.
-    It uses settings defined earlier to decide which sub-flows to execute.
-
-    :param file_path: Path to the file to be processed.
-    :param is_export_control: Boolean indicating whether the file is under export control.
-    :param send_to_nersc: Boolean indicating whether to send data to NERSC.
-    :param config: Configuration dictionary for the flow.
-    :param send_to_alcf: Boolean indicating whether to send data to ALCF.
-    :param folder_name: Name of the folder containing the files.
-    :param file_name: Name of the file to be processed.
+    Dispatcher flow that reads decision settings and launches tasks accordingly.
     """
     logger = get_run_logger()
     try:
-        # Validate input parameters using pydantic model
         inputs = DecisionFlowInputModel(
             file_path=file_path,
             is_export_control=is_export_control,
@@ -145,41 +135,33 @@ async def decision_flow(
         logger.error(f"Invalid input parameters: {e}")
         raise
 
-    try:
-        logger.info("Starting decision flow")
-        # Load the decision settings that were previously saved
-        decision_settings = await JSON.load("decision-settings")
-    except Exception as e:
-        logger.error(f"Failed to load decision settings: {e}")
-        raise
-
-    # Create a dictionary of all available parameters for potential use in sub-flows
+    # Run new_file_832 first (synchronously)
     available_params = inputs.dict()
+    try:
+        decision_settings = await JSON.load("decision-settings")
+        if decision_settings.value.get("new_832_file_flow/new_file_832"):
+            logger.info("Running new_file_832 flow...")
+            await run_specific_flow("new_832_file_flow/new_file_832",
+                                    FlowParameterMapper.get_flow_parameters(
+                                        "new_832_file_flow/new_file_832",
+                                        available_params))
+            logger.info("Completed new_file_832 flow.")
+    except Exception as e:
+        logger.error(f"new_832_file_flow/new_file_832 flow failed: {e}")
+        # Optionally, raise a specific ValueError
+        raise ValueError("new_file_832 flow Failed") from e
 
+    # Prepare ALCF and NERSC flows to run asynchronously, based on settings
     tasks = []
-    # Iterate over each flow specified in the decision settings
-    for flow_name, run_flow in decision_settings.value.items():
-        try:
-            logger.info(f"Evaluating flow: {flow_name}, run: {run_flow}")
-            # If the decision setting indicates to run the flow
-            if run_flow:
-                # Get the required parameters for the flow using FlowParameterMapper
-                flow_params = FlowParameterMapper.get_flow_parameters(flow_name, available_params)
-                # Append the task to the list of tasks to run
-                tasks.append(run_specific_flow(flow_name, flow_params))
-            else:
-                logger.info(f"Skipping {flow_name}")
-        except KeyError as e:
-            logger.error(f"Missing required parameter for flow {flow_name}: {e}")
-            raise
-        except ValueError as e:
-            logger.error(f"Flow name not found: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error while preparing flow {flow_name}: {e}")
-            raise
+    if decision_settings.value.get("alcf_recon_flow/alcf_recon_flow"):
+        alcf_params = FlowParameterMapper.get_flow_parameters("alcf_recon_flow/alcf_recon_flow", available_params)
+        tasks.append(run_specific_flow("alcf_recon_flow/alcf_recon_flow", alcf_params))
 
-    # Execute all the tasks concurrently, if there are any
+    if decision_settings.value.get("nersc_recon/nersc_recon"):
+        nersc_params = FlowParameterMapper.get_flow_parameters("nersc_recon/nersc_recon", available_params)
+        tasks.append(run_specific_flow("nersc_recon/nersc_recon", nersc_params))
+
+    # Run ALCF and NERSC flows in parallel, if any
     if tasks:
         try:
             await asyncio.gather(*tasks)
@@ -187,9 +169,10 @@ async def decision_flow(
             logger.error(f"Failed to run one or more tasks: {e}")
             raise
     else:
-        logger.info("No tasks to run")
+        logger.info("No ALCF or NERSC tasks to run based on decision settings.")
 
     return None
+
 
 if __name__ == "__main__":
     """
@@ -198,15 +181,18 @@ if __name__ == "__main__":
     """
     try:
         # Setup decision settings based on input parameters
-        setup_decision_settings(alcf_recon=True, nersc_recon=False, nersc_move=True)
+        setup_decision_settings(alcf_recon=True, nersc_recon=False, new_file_832=False)
         # Run the main decision flow with the specified parameters
-        asyncio.run(decision_flow(file_path="/path/to/file",
-                                  is_export_control=False,
-                                  send_to_nersc=True,
-                                  config={},
-                                  send_to_alcf=True,
-                                  folder_name="folder",
-                                  file_name="file"))
+        # asyncio.run(dispatcher(
+        #     config={},  # PYTEST, ALCF, NERSC
+        #     is_export_control=False,  # ALCF & MOVE
+        #     folder_name="folder",  # ALCF
+        #     file_name="file",  # ALCF
+        #     file_path="/path/to/file",  # MOVE
+        #     send_to_alcf=True,  # ALCF
+        #     send_to_nersc=True,  # MOVE
+        #     )
+        # )
     except Exception as e:
         logger = get_run_logger()
         logger.error(f"Failed to execute main flow: {e}")
