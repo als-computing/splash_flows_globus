@@ -25,15 +25,15 @@ globus:
       name: data832_scratch
 
     alcf832_raw:
-      root_path: /bl832/raw
+      root_path: /data/raw
       uri: alcf.anl.gov
-      uuid: 55c3adf6-31f1-4647-9a38-52591642f7e7
+      uuid: a89365da-e614-48fe-9ee5-f5e1698a68c8 # 55c3adf6-31f1-4647-9a38-52591642f7e7
       name: alcf_raw
 
     alcf832_scratch:
-      root_path: /bl832/scratch
+      root_path: /data/scratch
       uri: alcf.anl.gov
-      uuid: 55c3adf6-31f1-4647-9a38-52591642f7e7
+      uuid: a89365da-e614-48fe-9ee5-f5e1698a68c8 # 55c3adf6-31f1-4647-9a38-52591642f7e7
       name: alcf_scratch
 
     alcf_eagle832:
@@ -102,6 +102,3 @@ prefect:
 
 scicat:
   jobs_api_url: https://dataportal.als.lbl.gov/api/ingest/jobs
-
-
-
