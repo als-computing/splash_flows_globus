@@ -13,21 +13,19 @@ class FlowParameterMapper:
     flow_parameters = {
         # From alcf.py
         "alcf_recon_flow/alcf_recon_flow": [
-            "folder_name",
-            "file_name",
+            "file_path",
             "is_export_control",
-            "send_to_alcf"],
+            "config"],
         # From move.py
         "new_832_file_flow/new_file_832": [
             "file_path",
             "is_export_control",
-            "send_to_nersc",
             "config"],
         # Placeholder parameters for NERSC reconstruction
         "nersc_recon/nersc_recon": [
             "file_path",
-            "config",
-            "send_to_nersc"]  # Placeholder parameters for NERSC reconstruction
+            "is_export_control",
+            "config"]  # Placeholder parameters for NERSC reconstruction
     }
 
     @classmethod
@@ -53,11 +51,7 @@ class DecisionFlowInputModel(BaseModel):
     """
     file_path: Optional[str] = Field(default=None)
     is_export_control: Optional[bool] = Field(default=False)
-    send_to_nersc: Optional[bool] = Field(default=False)
     config: Optional[Union[dict, Any]] = Field(default_factory=dict)
-    send_to_alcf: Optional[bool] = Field(default=False)
-    folder_name: Optional[str] = Field(default=None)
-    file_name: Optional[str] = Field(default=None)
 
 
 @task(name="setup_decision_settings")
@@ -111,11 +105,7 @@ async def run_specific_flow(flow_name: str, parameters: dict) -> None:
 async def dispatcher(
     file_path: Optional[str] = None,
     is_export_control: bool = False,
-    send_to_nersc: bool = False,
     config: Optional[Union[dict, Any]] = None,
-    send_to_alcf: bool = False,
-    folder_name: Optional[str] = None,
-    file_name: Optional[str] = None
 ) -> None:
     """
     Dispatcher flow that reads decision settings and launches tasks accordingly.
@@ -125,11 +115,7 @@ async def dispatcher(
         inputs = DecisionFlowInputModel(
             file_path=file_path,
             is_export_control=is_export_control,
-            send_to_nersc=send_to_nersc,
             config=config,
-            send_to_alcf=send_to_alcf,
-            folder_name=folder_name,
-            file_name=file_name
         )
     except ValidationError as e:
         logger.error(f"Invalid input parameters: {e}")

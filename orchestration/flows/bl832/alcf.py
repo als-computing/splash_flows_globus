@@ -296,11 +296,11 @@ def alcf_globus_compute_reconstruction(
     Returns:
         str: confirmation message regarding reconstruction and time to completion
     """
-    iribeta_rundir = "/eagle/IRIBeta/als/bl832/raw"
-    iribeta_recon_script = "/eagle/IRIBeta/als/example/globus_reconstruction.py"
+    # iribeta_rundir = "/eagle/IRIBeta/als/bl832/raw"
+    # iribeta_recon_script = "/eagle/IRIBeta/als/example/globus_reconstruction.py"
 
-    # iri_als_bl832_rundir = "/eagle/IRI-ALS-832/data/raw"
-    # iri_als_bl832_recon_script = "/eagle/IRI-ALS-832/scripts/globus_reconstruction.py"
+    iri_als_bl832_rundir = "/eagle/IRI-ALS-832/data/raw"
+    iri_als_bl832_recon_script = "/eagle/IRI-ALS-832/scripts/globus_reconstruction.py"
 
     gcc = Client(code_serialization_strategy=CombinedCode())
 
@@ -308,8 +308,8 @@ def alcf_globus_compute_reconstruction(
         logger = get_run_logger()
         logger.info(f"Running Tomopy reconstruction on {file_name} at ALCF")
         future = fxe.submit(reconstruction_wrapper,
-                            iribeta_rundir,
-                            iribeta_recon_script,
+                            iri_als_bl832_rundir,
+                            iri_als_bl832_recon_script,
                             file_name,
                             folder_name)
         result = wait_for_globus_compute_future(future, "reconstruction", check_interval=10)
@@ -362,11 +362,11 @@ def alcf_globus_compute_tiff_to_zarr(
     Returns:
         str: confirmation message regarding reconstruction and time to completion
     """
-    iribeta_rundir = "/eagle/IRIBeta/als/bl832/raw"
-    iribeta_conversion_script = "/eagle/IRIBeta/als/example/tiff_to_zarr.py"
+    # iribeta_rundir = "/eagle/IRIBeta/als/bl832/raw"
+    # iribeta_conversion_script = "/eagle/IRIBeta/als/example/tiff_to_zarr.py"
 
-    # iri_als_bl832_rundir = "/eagle/IRI-ALS-832/data/raw"
-    # iri_als_bl832_conversion_script = "/eagle/IRI-ALS-832/scripts/tiff_to_zarr.py"
+    iri_als_bl832_rundir = "/eagle/IRI-ALS-832/data/raw"
+    iri_als_bl832_conversion_script = "/eagle/IRI-ALS-832/scripts/tiff_to_zarr.py"
 
     gcc = Client(code_serialization_strategy=CombinedCode())
 
@@ -374,8 +374,8 @@ def alcf_globus_compute_tiff_to_zarr(
         logger = get_run_logger()
         logger.info(f"Running Tiff to Zarr on {raw_path} at ALCF")
         future = fxe.submit(tiff_to_zarr_wrapper,
-                            iribeta_rundir,
-                            iribeta_conversion_script,
+                            iri_als_bl832_rundir,
+                            iri_als_bl832_conversion_script,
                             tiff_scratch_path,
                             raw_path)
         result = wait_for_globus_compute_future(future, "tiff to zarr conversion", check_interval=10)
@@ -416,10 +416,8 @@ def tiff_to_zarr_wrapper(
 
 @flow(name="alcf_recon_flow")
 def alcf_recon_flow(
-    folder_name: str,
-    file_name: str,
+    file_path: str,
     is_export_control: bool = False,
-    send_to_alcf: bool = True,
     config=None
 ) -> list:
     """
@@ -440,16 +438,19 @@ def alcf_recon_flow(
     if not config:
         config = Config832()
 
+    path = Path(file_path)
+    folder_name = path.parent.name
+    file_name = path.stem
+
     # Send data from data832 to ALCF, reconstructions run on ALCF and tiffs sent back to data832
-    if not is_export_control and send_to_alcf:
+    if not is_export_control:
         h5_file_name = file_name + '.h5'
 
-        alcf_raw_path = f"bl832/raw/{folder_name}"
+        alcf_raw_path = f"data/raw/{folder_name}"
+        # alcf_raw_path = f"bl832/raw/{folder_name}"
 
         data832_raw_path = f"{folder_name}/{h5_file_name}"
         data832_scratch_path = f"{folder_name}"
-
-        # nersc_scratch_path = f"8.3.2/scratch/{folder_name}"
 
         scratch_path_tiff = folder_name + '/rec' + file_name + '/'
         scratch_path_zarr = folder_name + '/rec' + file_name + '.zarr/'
@@ -481,8 +482,11 @@ def alcf_recon_flow(
 
                 # Step 2B: Run the Tiff to Zarr Globus Flow
                 logger.info(f"Running Tiff to Zarr on {file_name} at ALCF")
-                raw_path = f"/eagle/IRIBeta/als/{alcf_raw_path}/{h5_file_name}"
-                tiff_scratch_path = f"/eagle/IRIBeta/als/bl832/scratch/{folder_name}/rec{file_name}/"
+                raw_path = f"/eagle/IRI-ALS-832/{alcf_raw_path}/{h5_file_name}"
+                tiff_scratch_path = f"/eagle/IRI-ALS-832/data/scratch/{folder_name}/rec{file_name}/"
+
+                # raw_path = f"/eagle/IRIBeta/als/{alcf_raw_path}/{h5_file_name}"
+                # tiff_scratch_path = f"/eagle/IRIBeta/als/bl832/scratch/{folder_name}/rec{file_name}/"
                 alcf_tiff_to_zarr_success = alcf_globus_compute_tiff_to_zarr(
                     raw_path=raw_path,
                     tiff_scratch_path=tiff_scratch_path)
@@ -541,7 +545,7 @@ def alcf_recon_flow(
             data832_raw_path=f"{folder_name}/{h5_file_name}" if alcf_transfer_success else None,
             data832_scratch_path_tiff=f"{scratch_path_tiff}" if data832_tiff_transfer_success else None,
             data832_scratch_path_zarr=f"{scratch_path_zarr}" if data832_zarr_transfer_success else None,
-            one_minute=True,  # Set to False for production durations
+            one_minute=False,  # Set to False for production durations
             config=config
         )
 
