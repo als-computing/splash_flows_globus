@@ -228,11 +228,7 @@ def test_832_dispatcher(mocker: MockFixture):
     result = asyncio.run(dispatcher(
         file_path="/global/raw/transfer_tests/test.txt",
         is_export_control=False,
-        send_to_nersc=True,
-        config=MockConfig832(),
-        send_to_alcf=True,
-        folder_name="test_folder",
-        file_name="test_file"
+        config=MockConfig832()
     ))
 
     # Ensure the flow runs without throwing an error
@@ -305,8 +301,9 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
         from orchestration.flows.bl832.alcf import alcf_recon_flow
 
     """Test for the process of a new 832 ALCF flow"""
-    folder_name = "test_folder"
-    file_name = "test_file"
+    file_path = "/global/raw/transfer_tests/test.h5"
+    folder_name = "transfer_tests"
+    file_name = "test"
 
     # Mock the Config832 class inserting into the module being tested
     mock_config = MockConfig832()
@@ -327,14 +324,14 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     scratch_path_zarr = f"{folder_name}/rec{file_name}.zarr/"
 
     # Assert the expected results
-    # Case 1: Send to ALCF is True and is_export_control is False
+    # Case 1: is_export_control is False
     # Expect all functions to be called
-    send_to_alcf = True
     is_export_control = False
-    result = alcf_recon_flow(folder_name, file_name, is_export_control, send_to_alcf, config=mock_config)
+
+    result = alcf_recon_flow(file_path, is_export_control, config=mock_config)
 
     mock_transfer_to_alcf.assert_called_once_with(
-        f"{folder_name}/{file_name}.h5",
+        "transfer_tests/test.h5",
         mock_config.tc,
         mock_config.data832_raw,
         mock_config.alcf832_raw)
@@ -342,8 +339,8 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_reconstruction_flow.assert_called_once_with(
         folder_name=folder_name, file_name=f"{file_name}.h5")
 
-    raw_path = f"/eagle/IRIBeta/als/bl832/raw/{alcf_raw_path}"
-    tiff_scratch_path = f"/eagle/IRIBeta/als/bl832/scratch/{folder_name}/rec{file_name}/"
+    raw_path = f"/eagle/IRI-ALS-832/data/raw/{alcf_raw_path}"
+    tiff_scratch_path = f"/eagle/IRI-ALS-832/data/scratch/{folder_name}/rec{file_name}/"
 
     mock_alcf_tiff_to_zarr_flow.assert_called_once_with(
         raw_path=raw_path,
@@ -364,7 +361,7 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
         data832_raw_path=alcf_raw_path,
         data832_scratch_path_tiff=f"{scratch_path_tiff}",
         data832_scratch_path_zarr=f"{scratch_path_zarr}",
-        one_minute=True,
+        one_minute=False,
         config=mock_config
     )
     assert isinstance(result, list), "Result should be a list"
@@ -375,11 +372,10 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_transfer_to_data832.reset_mock()
     mock_schedule_pruning.reset_mock()
 
-    # Case 2: Send to ALCF is False and is_export_control is False
+    # Case 2: is_export_control is True
     # Expect no functions to be called
-    send_to_alcf = False
-    is_export_control = False
-    result = alcf_recon_flow(folder_name, file_name, is_export_control, send_to_alcf, config=mock_config)
+    is_export_control = True
+    result = alcf_recon_flow(file_path, is_export_control, config=mock_config)
     mock_transfer_to_alcf.assert_not_called()
     mock_reconstruction_flow.assert_not_called()
     mock_alcf_tiff_to_zarr_flow.assert_not_called()
@@ -393,35 +389,3 @@ def test_process_new_832_ALCF_flow(mocker: MockFixture):
     mock_alcf_tiff_to_zarr_flow.reset_mock()
     mock_transfer_to_data832.reset_mock()
     mock_schedule_pruning.reset_mock()
-
-    # Case 3: Send to ALCF is False and is_export_control is True
-    # Expect no functions to be called
-    send_to_alcf = False
-    is_export_control = True
-    result = alcf_recon_flow(folder_name, file_name, is_export_control, send_to_alcf, config=mock_config)
-    mock_transfer_to_alcf.assert_not_called()
-    mock_reconstruction_flow.assert_not_called()
-    mock_alcf_tiff_to_zarr_flow.assert_not_called()
-    mock_transfer_to_data832.assert_not_called()
-    mock_schedule_pruning.assert_not_called()
-    assert isinstance(result, list), "Result should be a list"
-    assert result == [False, False, False, False, False], "Result does not match expected values"
-
-    mock_transfer_to_alcf.reset_mock()
-    mock_reconstruction_flow.reset_mock()
-    mock_alcf_tiff_to_zarr_flow.reset_mock()
-    mock_transfer_to_data832.reset_mock()
-    mock_schedule_pruning.reset_mock()
-
-    # Case 4: Send to ALCF is True and is_export_control is True
-    # Expect no functions to be called
-    send_to_alcf = True
-    is_export_control = True
-    result = alcf_recon_flow(folder_name, file_name, is_export_control, send_to_alcf, config=mock_config)
-    mock_transfer_to_alcf.assert_not_called()
-    mock_reconstruction_flow.assert_not_called()
-    mock_alcf_tiff_to_zarr_flow.assert_not_called()
-    mock_transfer_to_data832.assert_not_called()
-    mock_schedule_pruning.assert_not_called()
-    assert isinstance(result, list), "Result should be a list"
-    assert result == [False, False, False, False, False], "Result does not match expected values"
