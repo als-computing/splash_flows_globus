@@ -1,19 +1,19 @@
 import json
 import logging
-from pathlib import Path
-import time
+# from pathlib import Path
+# import time
 
-from authlib.integrations.requests_client import OAuth2Session
-from authlib.oauth2.rfc7523 import PrivateKeyJWT
+# from authlib.integrations.requests_client import OAuth2Session
+# from authlib.oauth2.rfc7523 import PrivateKeyJWT
 from authlib.jose import JsonWebKey
 
 from sfapi_client import Client
-from sfapi_client._sync.client import SFAPI_BASE_URL, SFAPI_TOKEN_URL
+# from sfapi_client._sync.client import SFAPI_BASE_URL, SFAPI_TOKEN_URL
 from sfapi_client.compute import Machine
 
 # Temporary patch till the sfapi_client is updated
 from sfapi_client.jobs import JobSacct
-from sfapi_client.compute import Compute
+# from sfapi_client.compute import Compute
 JobSacct.model_rebuild()
 
 
@@ -34,9 +34,8 @@ class NerscClient(Client):
         # Reading the client_id and private key from the files
         self.client_id = None
         self.pri_key = None
-        #self.session = None
+        # self.session = None
         self.init_client_info()
-        
 
         super().__init__(self.client_id, self.pri_key)
 
@@ -80,7 +79,7 @@ class NerscClient(Client):
 
     def update_job_id(self):
         if self.job is None:
-            self.logger.info(f"No job found")
+            self.logger.info("No job found")
         else:
             self.jobid = self.job.jobid
 
@@ -89,7 +88,7 @@ class NerscClient(Client):
         self.job_state = self.job.state
         
         if self.job_state == "RUNNING":
-                self.has_ran = True
+            self.has_ran = True
         elif self.job_state == "COMPLETE":
             self.logger.info(f"Job {self.jobid} with COMPLETE status")
 
@@ -104,6 +103,6 @@ class NerscClient(Client):
         self.logger.info(f"Submitting job with script: {job_script}")
         self.job = self.perlmutter.submit_job(job_script)
         self.update_job_id()
-        #self.update_job_state()
+        # self.update_job_state()
         self.logger.info(f"Submitted job id: {self.jobid}")
 
