@@ -21,3 +21,4 @@ class Config832:
         self.alcf832_raw = self.endpoints["alcf832_raw"]
         self.alcf832_scratch = self.endpoints["alcf832_scratch"]
         self.scicat = config["scicat"]
+        self.harbor_images832 = config["harbor_images832"]

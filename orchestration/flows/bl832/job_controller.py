@@ -3,13 +3,14 @@ from dotenv import load_dotenv
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 
 from orchestration.flows.bl832.config import Config832
 from orchestration.nersc import NerscClient
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+load_dotenv()
 
 
 class TomographyHPCController(ABC):
@@ -20,21 +21,20 @@ class TomographyHPCController(ABC):
     Args:
         ABC: Abstract Base Class
     """
-    def __init__(self):
+    def __init__(
+        self,
+        Config832: Optional[Config832] = None
+    ) -> None:
         pass
 
     @abstractmethod
     def reconstruct(
         self,
         file_path: str = "",
-        is_export_control: bool = False,
-        config: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Perform tomography reconstruction
 
         :param file_path: Path to the file to reconstruct.
-        :param is_export_control: Flag indicating export control restrictions.
-        :param config: Optional configuration dictionary.
         :return: True if successful, False otherwise.
         """
         pass
@@ -43,14 +43,10 @@ class TomographyHPCController(ABC):
     def build_multi_resolution(
         self,
         file_path: str = "",
-        is_export_control: bool = False,
-        config: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Generate multi-resolution version of reconstructed tomography
 
         :param file_path: Path to the file for which to build multi-resolution data.
-        :param is_export_control: Flag indicating export control restrictions.
-        :param config: Optional configuration dictionary.
         :return: True if successful, False otherwise.
         """
         pass
@@ -62,17 +58,15 @@ class ALCFTomographyHPCController(TomographyHPCController):
     Methods here leverage Globus Compute for processing tasks.
 
     Args:
-        TomographyHPCController (_type_): _description_
+        TomographyHPCController (ABC): Abstract class for tomography HPC controllers.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def reconstruct(
         self,
         file_path: str = "",
-        is_export_control: bool = False,
-        config: Optional[Dict[str, Any]] = None
     ) -> bool:
 
         # uses Globus Compute to reconstruct the tomography
@@ -81,10 +75,9 @@ class ALCFTomographyHPCController(TomographyHPCController):
     def build_multi_resolution(
         self,
         file_path: str = "",
-        is_export_control: bool = False,
-        config: Optional[Dict[str, Any]] = None
     ) -> bool:
         # uses Globus Compute to build multi-resolution tomography
+
         pass
 
 
@@ -95,65 +88,20 @@ class NERSCTomographyHPCController(TomographyHPCController):
     Submits reconstruction and multi-resolution jobs to NERSC via SFAPI.
     """
 
-    def __init__(self):
-        self.client = self._create_nersc_client()
-
-    def reconstruct(
+    def __init__(
         self,
-        file_path: str = "",
-        is_export_control: bool = False,
-        config: Optional[Dict[str, Any]] = None
-    ) -> bool:
-        """
-        Use NERSC for tomography reconstruction
-        """
-        logger.info("Starting NERSC reconstruction process.")
-
-        if is_export_control:
-            logger.warning("File is export controlled; skipping NERSC reconstruction.")
-            return False
+        client: NerscClient = None,
+        Config832: Optional[Config832] = None
+    ) -> None:
+        self.client = client
+        if not Config832:
+            self.config = Config832()
         else:
-            logger.info("File is not export controlled; proceeding with NERSC reconstruction.")
+            self.config = Config832
 
-        if not config:
-            config = Config832()
-
-        nersc_reconstruction_success = self._submit_nersc_reconstruction_job(
-            file_path=file_path
-        )
-
-        logger.info(f"Was NERSC reconstruction successful: {nersc_reconstruction_success}")
-
-        return nersc_reconstruction_success
-
-    def build_multi_resolution(
-        self,
-        file_path: str = "",
-        is_export_control: bool = False,
-        config: Optional[Dict[str, Any]] = None
-    ) -> bool:
-        """Use NERSC to make multiresolution version of tomography results."""
-
-        if is_export_control:
-            logger.warning("File is export controlled; skipping NERSC multi-resolution task.")
-            return False
-        else:
-            logger.info("File is not export controlled; proceeding with NERSC multi-resolution task.")
-
-        if not config:
-            config = Config832()
-
-        nersc_multi_resolution_success = self._submit_nersc_multi_resolution_job(
-            file_path=file_path
-        )
-
-        logger.info(f"Was NERSC multi-resolution conversion successful: {nersc_multi_resolution_success}")
-
-        return nersc_multi_resolution_success
-
-    def _create_nersc_client(self) -> NerscClient:
+    def create_nersc_client() -> NerscClient:
         """Create and return an NERSC client instance"""
-        load_dotenv()
+
         client_id_path = os.getenv("PATH_NERSC_CLIENT_ID")
         sfapi_key_path = os.getenv("PATH_NERSC_PRI_KEY")
 
@@ -170,17 +118,14 @@ class NERSCTomographyHPCController(TomographyHPCController):
             logger.error(f"Failed to create NERSC client: {e}")
             raise e
 
-    def _submit_nersc_reconstruction_job(
+    def reconstruct(
         self,
-        file_path: str = None
+        file_path: str = "",
     ) -> bool:
-        """Submit a tomography reconstruction job to NERSC"""
-
-        if self.client is None:
-            logger.error("NERSC client is required for job submission.")
-            raise ValueError("NERSC client is required for job submission.")
-
-        load_dotenv()
+        """
+        Use NERSC for tomography reconstruction
+        """
+        logger.info("Starting NERSC reconstruction process.")
 
         # Can't use this long term in production. Need to find a better way to handle credentials.
         # Want to run this as the alsdev user
@@ -194,10 +139,15 @@ class NERSCTomographyHPCController(TomographyHPCController):
         logger.info(home_path)
         logger.info(scratch_path)
 
-        image_name = "tomorecon_nersc_mpi_hdf5@sha256:cc098a2cfb6b1632ea872a202c66cb7566908da066fd8f8c123b92fa95c2a43c"
+        image_name = self.config.harbor_images832["recon_image"]
         path = Path(file_path)
         folder_name = path.parent.name
         file_name = path.stem
+
+        # Can't use this long term in production. Need to find a better way to handle credentials.
+        # Want to run this as the alsdev user
+        username = os.getenv("NERSC_USERNAME")
+        password = os.getenv("NERSC_PASSWORD")
 
         job_script = f"""#!/bin/bash
             #SBATCH -q preempt
@@ -236,17 +186,12 @@ class NERSCTomographyHPCController(TomographyHPCController):
             logger.error(f"Failed to submit or complete reconstruction job: {e}")
             return False
 
-    def _submit_nersc_multi_resolution_job(
+    def build_multi_resolution(
         self,
-        file_path: str = None,
+        file_path: str = "",
     ) -> bool:
-        """Submit a multi-resolution tomography job to NERSC"""
+        """Use NERSC to make multiresolution version of tomography results."""
 
-        if self.client is None:
-            logger.error("NERSC client is required for job submission.")
-            raise ValueError("NERSC client is required for job submission.")
-
-        load_dotenv()
         username = os.getenv("NERSC_USERNAME")
         password = os.getenv("NERSC_PASSWORD")
 
@@ -257,7 +202,7 @@ class NERSCTomographyHPCController(TomographyHPCController):
         logger.info(home_path)
         logger.info(scratch_path)
 
-        image_name = "tomorecon_nersc_mpi_hdf5@sha256:cc098a2cfb6b1632ea872a202c66cb7566908da066fd8f8c123b92fa95c2a43c"
+        image_name = self.config.harbor_images832["multires_image"]
         recon_path = file_path
         raw_path = file_path
 
@@ -316,12 +261,13 @@ def get_controller(
     if hpc_type == "ALCF":
         return ALCFTomographyHPCController()
     elif hpc_type == "NERSC":
-        return NERSCTomographyHPCController()
+        client = NERSCTomographyHPCController.create_nersc_client()
+        return NERSCTomographyHPCController(client=client)
     else:
         raise ValueError("Invalid HPC type")
 
 
-def do_it_all():
+def do_it_all() -> None:
     controller = get_controller("ALCF")
     controller.reconstruct()
     controller.build_multi_resolution()
@@ -330,11 +276,9 @@ def do_it_all():
     controller = get_controller("NERSC")
     controller.reconstruct(
         file_path=file_path,
-        is_export_control=False,
     )
     controller.build_multi_resolution(
         file_path=file_path,
-        is_export_control=False,
     )
 
 
