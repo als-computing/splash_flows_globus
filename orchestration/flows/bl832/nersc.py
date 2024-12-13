@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 from prefect import flow
+import re
 import time
 from typing import Optional
 
@@ -122,16 +123,39 @@ date
         try:
             logger.info("Submitting reconstruction job script to Perlmutter.")
             job = self.client.perlmutter.submit_job(job_script)
-            logging.info(job.jobid)
-            job.update()
-            time.sleep(60)  # Wait 60 seconds for job to register before checking status
-            logging.info(job.state)
-            job.complete()  # waits for job completion
+            logger.info(f"Submitted job ID: {job.jobid}")
+
+            try:
+                job.update()
+            except Exception as update_err:
+                logger.warning(f"Initial job update failed, continuing: {update_err}")
+
+            time.sleep(60)
+            logger.info(f"Job {job.jobid} current state: {job.state}")
+
+            job.complete()  # Wait until the job completes
             logger.info("Reconstruction job completed successfully.")
             return True
+
         except Exception as e:
-            logger.error(f"Failed to submit or complete reconstruction job: {e}")
-            return False
+            logger.info(f"Error during job submission or completion: {e}")
+            match = re.search(r"Job not found:\s*(\d+)", str(e))
+
+            if match:
+                jobid = match.group(1)
+                logger.info(f"Attempting to recover job {jobid}.")
+                try:
+                    job = self.client.perlmutter.job(jobid=jobid)
+                    time.sleep(30)
+                    job.complete()
+                    logger.info("Reconstruction job completed successfully after recovery.")
+                    return True
+                except Exception as recovery_err:
+                    logger.error(f"Failed to recover job {jobid}: {recovery_err}")
+                    return False
+            else:
+                # Unknown error: cannot recover
+                return False
 
     def build_multi_resolution(
         self,
@@ -192,13 +216,38 @@ date
         try:
             logger.info("Submitting Tiff to Zarr job script to Perlmutter.")
             job = self.client.perlmutter.submit_job(job_script)
-            time.sleep(30)  # Wait 30 seconds before checking job completion
-            job.complete()  # waits for job completion
-            logger.info("Tiff to Zarr job completed successfully.")
+            logger.info(f"Submitted job ID: {job.jobid}")
+
+            try:
+                job.update()
+            except Exception as update_err:
+                logger.warning(f"Initial job update failed, continuing: {update_err}")
+
+            time.sleep(60)
+            logger.info(f"Job {job.jobid} current state: {job.state}")
+
+            job.complete()  # Wait until the job completes
+            logger.info("Reconstruction job completed successfully.")
             return True
+
         except Exception as e:
-            logger.error(f"Failed to submit or complete Tiff to Zarr job: {e}")
-            return False
+            logger.warning(f"Error during job submission or completion: {e}")
+            match = re.search(r"Job not found:\s*(\d+)", str(e))
+
+            if match:
+                jobid = match.group(1)
+                logger.info(f"Attempting to recover job {jobid}.")
+                try:
+                    job = self.client.perlmutter.job(jobid=jobid)
+                    time.sleep(30)
+                    job.complete()
+                    logger.info("Reconstruction job completed successfully after recovery.")
+                    return True
+                except Exception as recovery_err:
+                    logger.error(f"Failed to recover job {jobid}: {recovery_err}")
+                    return False
+            else:
+                return False
 
 
 @flow(name="nersc_recon_flow")
@@ -214,14 +263,14 @@ def nersc_recon_flow(
     # To do: Implement file transfers, pruning, and other necessary steps
 
     controller = get_controller(HPC.NERSC)
-    nersc_reconstruction_success = controller.reconstruct(
-        file_path=file_path,
-    )
+    # nersc_reconstruction_success = controller.reconstruct(
+    #     file_path=file_path,
+    # )
     nersc_multi_res_success = controller.build_multi_resolution(
         file_path=file_path,
     )
 
-    if nersc_reconstruction_success and nersc_multi_res_success:
+    if nersc_multi_res_success:  # nersc_reconstruction_success and nersc_multi_res_success:
         return True
     else:
         return False
