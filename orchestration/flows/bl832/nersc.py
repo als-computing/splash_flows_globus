@@ -263,14 +263,14 @@ def nersc_recon_flow(
     # To do: Implement file transfers, pruning, and other necessary steps
 
     controller = get_controller(HPC.NERSC)
-    # nersc_reconstruction_success = controller.reconstruct(
-    #     file_path=file_path,
-    # )
+    nersc_reconstruction_success = controller.reconstruct(
+        file_path=file_path,
+    )
     nersc_multi_res_success = controller.build_multi_resolution(
         file_path=file_path,
     )
 
-    if nersc_multi_res_success:  # nersc_reconstruction_success and nersc_multi_res_success:
+    if nersc_reconstruction_success and nersc_multi_res_success:
         return True
     else:
         return False
