@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+import json
 import logging
 import os
 from pathlib import Path
@@ -7,9 +8,13 @@ import re
 import time
 from typing import Optional
 
+from authlib.jose import JsonWebKey
+from sfapi_client import Client
+from sfapi_client.compute import Machine
+
 from orchestration.flows.bl832.config import Config832
 from orchestration.flows.bl832.job_controller import get_controller, HPC, TomographyHPCController
-from orchestration.nersc import NerscClient
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -25,7 +30,7 @@ class NERSCTomographyHPCController(TomographyHPCController):
 
     def __init__(
         self,
-        client: NerscClient = None,
+        client: Client = None,
         config: Optional[Config832] = None
     ) -> None:
         self.client = client
@@ -35,21 +40,31 @@ class NERSCTomographyHPCController(TomographyHPCController):
         else:
             self.config = config
 
-    def create_nersc_client() -> NerscClient:
+    def create_sfapi_client() -> Client:
         """Create and return an NERSC client instance"""
 
         client_id_path = os.getenv("PATH_NERSC_CLIENT_ID")
-        sfapi_key_path = os.getenv("PATH_NERSC_PRI_KEY")
+        client_secret_path = os.getenv("PATH_NERSC_PRI_KEY")
 
-        if not client_id_path or not sfapi_key_path:
+        if not client_id_path or not client_secret_path:
             logger.error("NERSC credentials paths are missing.")
             raise ValueError("Missing NERSC credentials paths.")
-        if not os.path.isfile(client_id_path) or not os.path.isfile(sfapi_key_path):
+        if not os.path.isfile(client_id_path) or not os.path.isfile(client_secret_path):
             logger.error("NERSC credential files are missing.")
             raise FileNotFoundError("NERSC credential files are missing.")
 
+        client_id = None
+        client_secret = None
+        with open(client_id_path, "r") as f:
+            client_id = f.read()
+
+        with open(client_secret_path, "r") as f:
+            client_secret = JsonWebKey.import_key(json.loads(f.read()))
+
         try:
-            return NerscClient(client_id_path, sfapi_key_path)
+            client = Client(client_id, client_secret)
+            logger.info("NERSC client created successfully.")
+            return client
         except Exception as e:
             logger.error(f"Failed to create NERSC client: {e}")
             raise e
@@ -67,7 +82,6 @@ class NERSCTomographyHPCController(TomographyHPCController):
         # Want to run this as the alsdev user
         # username = os.getenv("NERSC_USERNAME")
         # password = os.getenv("NERSC_PASSWORD")
-
         user = self.client.user()
 
         home_path = f"/global/homes/{user.name[0]}/{user.name}"
@@ -95,6 +109,7 @@ class NERSCTomographyHPCController(TomographyHPCController):
         # then you must login to Harbor first (hopefully we can get a robot account)
         # Looking into using github actions to build the image and host it on on github instead
         # srun podman-hpc login registry.nersc.gov --username {username} --password {password}
+# SBATCH -q debug
 
         job_script = f"""#!/bin/bash
 #SBATCH -q debug
@@ -122,7 +137,8 @@ date
 
         try:
             logger.info("Submitting reconstruction job script to Perlmutter.")
-            job = self.client.perlmutter.submit_job(job_script)
+            perlmutter = self.client.compute(Machine.perlmutter)
+            job = perlmutter.submit_job(job_script)
             logger.info(f"Submitted job ID: {job.jobid}")
 
             try:
@@ -215,7 +231,8 @@ date
 """
         try:
             logger.info("Submitting Tiff to Zarr job script to Perlmutter.")
-            job = self.client.perlmutter.submit_job(job_script)
+            perlmutter = self.client.compute(Machine.perlmutter)
+            job = perlmutter.submit_job(job_script)
             logger.info(f"Submitted job ID: {job.jobid}")
 
             try:

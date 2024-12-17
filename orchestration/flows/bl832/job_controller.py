@@ -80,7 +80,7 @@ def get_controller(hpc_type: HPC) -> TomographyHPCController:
     elif hpc_type == HPC.NERSC:
         from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
         return NERSCTomographyHPCController(
-            NERSCTomographyHPCController.create_nersc_client()
+            NERSCTomographyHPCController.create_sfapi_client()
         )
     else:
         raise ValueError(f"Unsupported HPC type: {hpc_type}")

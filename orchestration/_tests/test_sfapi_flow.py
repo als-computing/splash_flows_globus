@@ -28,6 +28,9 @@ def prefect_test_fixture():
     with prefect_test_harness():
         globus_client_id = Secret(value=str(uuid4()))
         globus_client_id.save(name="globus-client-id")
+        globus_client_secret = Secret(value=str(uuid4()))
+        globus_client_secret.save(name="globus-client-secret")
+
         yield
 
 
@@ -97,10 +100,10 @@ def test_nersc_recon_flow_failure(mock_controller):
 
 def test_nersc_client_initialization_error():
     """Test error handling during NERSC client initialization."""
-    with patch("orchestration.flows.bl832.nersc.NERSCTomographyHPCController.create_nersc_client",
+    with patch("orchestration.flows.bl832.nersc.NERSCTomographyHPCController.create_sfapi_client",
                side_effect=ValueError("Missing NERSC credentials paths.")):
         with pytest.raises(ValueError, match="Missing NERSC credentials paths."):
-            NERSCTomographyHPCController.create_nersc_client()
+            NERSCTomographyHPCController.create_sfapi_client()
 
 
 def test_job_submission(mock_controller):
