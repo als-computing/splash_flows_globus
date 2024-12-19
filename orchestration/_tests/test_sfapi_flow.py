@@ -1,18 +1,11 @@
-import pytest
-from unittest.mock import MagicMock, PropertyMock, patch
-from uuid import uuid4
+# orchestration/_tests/test_sfapi_flow.py
 
+import pytest
+from unittest.mock import MagicMock, patch, mock_open
+from pathlib import Path
+from uuid import uuid4
 from prefect.blocks.system import Secret
 from prefect.testing.utilities import prefect_test_harness
-
-# Patch Secret.load globally before importing application code
-with patch("prefect.blocks.system.Secret.load") as mock_secret_load:
-    mock_secret_load.return_value = Secret(value=str(uuid4()))
-    # Import application modules after patching Secret.load
-    from orchestration.flows.bl832.nersc import nersc_recon_flow, NERSCTomographyHPCController
-    from orchestration.flows.bl832.config import Config832
-    from orchestration.flows.bl832.job_controller import HPC
-    from orchestration.nersc import NerscClient
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -34,102 +27,259 @@ def prefect_test_fixture():
         yield
 
 
-@pytest.fixture
-def mock_nersc_client():
-    """Fixture to mock the NerscClient class."""
-    mock_client = MagicMock(spec=NerscClient)
-    mock_client.user.return_value.name = "testuser"
-
-    # Mock perlmutter client with job-related methods
-    perlmutter_mock = MagicMock()
-    type(mock_client).perlmutter = PropertyMock(return_value=perlmutter_mock)
-    perlmutter_mock.submit_job.return_value.jobid = "12345"
-    perlmutter_mock.submit_job.return_value.state = "COMPLETED"
-    perlmutter_mock.job.return_value.state = "COMPLETED"
-    perlmutter_mock.job.return_value.complete = MagicMock()
-    perlmutter_mock.job.return_value.jobid = "12345"
-
-    return mock_client
+# ----------------------------
+# Tests for create_sfapi_client
+# ----------------------------
 
 
-@pytest.fixture
-def mock_config832():
-    """Fixture to mock the Config832 class."""
-    mock_config = MagicMock(spec=Config832)
-    mock_config.harbor_images832 = {
-        "recon_image": "mock_recon_image",
-        "multires_image": "mock_multires_image",
-    }
-    return mock_config
+def test_create_sfapi_client_success():
+    """
+    Test successful creation of the SFAPI client.
+    """
+    from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
+
+    # Mock data for client_id and client_secret files
+    mock_client_id = 'value'
+    mock_client_secret = '{"key": "value"}'
+
+    # Create separate mock_open instances for each file
+    mock_open_client_id = mock_open(read_data=mock_client_id)
+    mock_open_client_secret = mock_open(read_data=mock_client_secret)
+
+    with patch("orchestration.flows.bl832.nersc.os.getenv") as mock_getenv, \
+         patch("orchestration.flows.bl832.nersc.os.path.isfile") as mock_isfile, \
+         patch("builtins.open", side_effect=[
+             mock_open_client_id.return_value,
+             mock_open_client_secret.return_value
+         ]), \
+            patch("orchestration.flows.bl832.nersc.JsonWebKey.import_key") as mock_import_key, \
+            patch("orchestration.flows.bl832.nersc.Client") as MockClient:
+
+        # Mock environment variables
+        mock_getenv.side_effect = lambda x: {
+            "PATH_NERSC_CLIENT_ID": "/path/to/client_id",
+            "PATH_NERSC_PRI_KEY": "/path/to/client_secret"
+        }.get(x, None)
+
+        # Mock file existence
+        mock_isfile.return_value = True
+
+        # Mock JsonWebKey.import_key to return a mock secret
+        mock_import_key.return_value = "mock_secret"
+
+        # Create the client
+        client = NERSCTomographyHPCController.create_sfapi_client()
+
+        # Assert that Client was instantiated with 'value' and 'mock_secret'
+        MockClient.assert_called_once_with("value", "mock_secret")
+
+        # Assert that the returned client is the mocked client
+        assert client == MockClient.return_value, "Client should be the mocked sfapi_client.Client instance"
 
 
-@pytest.fixture
-def mock_controller(mock_nersc_client, mock_config832):
-    """Fixture to mock the NERSCTomographyHPCController class."""
-    with patch("orchestration.flows.bl832.job_controller.get_controller") as mock_get_controller:
-        mock_get_controller.return_value = MagicMock(
-            spec=HPC.NERSC,
-            client=mock_nersc_client,
-            config=mock_config832
-        )
-        mock_get_controller.return_value.build_multi_resolution = MagicMock(return_value=True)
-        mock_get_controller.return_value.reconstruct = MagicMock(return_value=True)
-        yield mock_get_controller.return_value
+def test_create_sfapi_client_missing_paths():
+    """
+    Test creation of the SFAPI client with missing credential paths.
+    """
+    from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
 
-
-def test_nersc_recon_flow_success(mock_controller):
-    """Test the nersc_recon_flow for a successful run."""
-    file_path = "dabramov/20230606_151124_jong-seto_fungal-mycelia_roll-AQ_fungi1_fast.h5"
-
-    with patch("orchestration.flows.bl832.nersc.get_controller", return_value=mock_controller):
-        result = nersc_recon_flow(file_path=file_path)
-
-    assert result is True, "nersc_recon_flow should return True for a successful run."
-
-
-def test_nersc_recon_flow_failure(mock_controller):
-    """Test the nersc_recon_flow for a failure scenario."""
-    file_path = "dabramov/20230606_151124_jong-seto_fungal-mycelia_roll-AQ_fungi1_fast.h5"
-    mock_controller.build_multi_resolution.return_value = False
-
-    with patch("orchestration.flows.bl832.nersc.get_controller", return_value=mock_controller):
-        result = nersc_recon_flow(file_path=file_path)
-
-    assert result is False, "nersc_recon_flow should return False for a failure scenario."
-
-
-def test_nersc_client_initialization_error():
-    """Test error handling during NERSC client initialization."""
-    with patch("orchestration.flows.bl832.nersc.NERSCTomographyHPCController.create_sfapi_client",
-               side_effect=ValueError("Missing NERSC credentials paths.")):
+    with patch("orchestration.flows.bl832.nersc.os.getenv", return_value=None):
         with pytest.raises(ValueError, match="Missing NERSC credentials paths."):
             NERSCTomographyHPCController.create_sfapi_client()
 
 
-def test_job_submission(mock_controller):
-    """Test job submission and status updates."""
-    job_script = "mock_job_script"
-    mock_job = mock_controller.client.perlmutter.submit_job.return_value
-    job_id = mock_job.jobid
+def test_create_sfapi_client_missing_files():
+    """
+    Test creation of the SFAPI client with missing credential files.
+    """
+    with (
+        # Mock environment variables
+        patch(
+            "orchestration.flows.bl832.nersc.os.getenv",
+            side_effect=lambda x: {
+                "PATH_NERSC_CLIENT_ID": "/path/to/client_id",
+                "PATH_NERSC_PRI_KEY": "/path/to/client_secret"
+            }.get(x, None)
+        ),
 
-    mock_controller.client.perlmutter.submit_job(job_script)
-    mock_controller.client.perlmutter.submit_job.assert_called_once_with(job_script)
-    assert job_id == "12345", "Job ID should match the mock job ID."
+        # Mock file existence to simulate missing files
+        patch("orchestration.flows.bl832.nersc.os.path.isfile", return_value=False)
+    ):
+        # Import the module after applying patches to ensure mocks are in place
+        from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
+
+        # Expect a FileNotFoundError due to missing credential files
+        with pytest.raises(FileNotFoundError, match="NERSC credential files are missing."):
+            NERSCTomographyHPCController.create_sfapi_client()
+
+# ----------------------------
+# Fixture for Mocking SFAPI Client
+# ----------------------------
 
 
-def test_job_recovery(mock_controller):
-    """Test recovery of a failed or lost job."""
-    mock_job = mock_controller.client.perlmutter.job.return_value
-    mock_job.complete = MagicMock()
+@pytest.fixture
+def mock_sfapi_client():
+    """
+    Mock the sfapi_client.Client class with necessary methods.
+    """
+    with patch("orchestration.flows.bl832.nersc.Client") as MockClient:
+        mock_client_instance = MockClient.return_value
 
-    mock_controller.client.perlmutter.job.side_effect = [
-        FileNotFoundError("Job not found: 12345"),
-        mock_job
-    ]
+        # Mock the user method
+        mock_user = MagicMock()
+        mock_user.name = "testuser"
+        mock_client_instance.user.return_value = mock_user
 
-    with patch("time.sleep", return_value=None):
-        recon_result = mock_controller.reconstruct(file_path="mock_file_path")
-        multires_result = mock_controller.build_multi_resolution(file_path="mock_file_path")
+        # Mock the compute method to return a mocked compute object
+        mock_compute = MagicMock()
+        mock_job = MagicMock()
+        mock_job.jobid = "12345"
+        mock_job.state = "COMPLETED"
+        mock_compute.submit_job.return_value = mock_job
+        mock_client_instance.compute.return_value = mock_compute
 
-    assert recon_result is True, "Job recovery should succeed."
-    assert multires_result is True, "Job recovery should succeed."
+        yield mock_client_instance
+
+
+# ----------------------------
+# Fixture for Mocking Config832
+# ----------------------------
+
+@pytest.fixture
+def mock_config832():
+    """
+    Mock the Config832 class to provide necessary configurations.
+    """
+    with patch("orchestration.flows.bl832.nersc.Config832") as MockConfig:
+        mock_config = MockConfig.return_value
+        mock_config.harbor_images832 = {
+            "recon_image": "mock_recon_image",
+            "multires_image": "mock_multires_image",
+        }
+        mock_config.apps = {"als_transfer": "some_config"}
+        yield mock_config
+
+
+# ----------------------------
+# Tests for NERSCTomographyHPCController
+# ----------------------------
+
+def test_reconstruct_success(mock_sfapi_client, mock_config832):
+    """
+    Test successful reconstruction job submission.
+    """
+    from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
+    from sfapi_client.compute import Machine
+
+    controller = NERSCTomographyHPCController(client=mock_sfapi_client, config=mock_config832)
+    file_path = "path/to/file.h5"
+
+    with patch("orchestration.flows.bl832.nersc.time.sleep", return_value=None):
+        result = controller.reconstruct(file_path=file_path)
+
+    # Verify that compute was called with Machine.perlmutter
+    mock_sfapi_client.compute.assert_called_once_with(Machine.perlmutter)
+
+    # Verify that submit_job was called once
+    mock_sfapi_client.compute.return_value.submit_job.assert_called_once()
+
+    # Verify that complete was called on the job
+    mock_sfapi_client.compute.return_value.submit_job.return_value.complete.assert_called_once()
+
+    # Assert that the method returns True
+    assert result is True, "reconstruct should return True on successful job completion."
+
+
+def test_reconstruct_submission_failure(mock_sfapi_client, mock_config832):
+    """
+    Test reconstruction job submission failure.
+    """
+    from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
+
+    controller = NERSCTomographyHPCController(client=mock_sfapi_client, config=mock_config832)
+    file_path = "path/to/file.h5"
+
+    # Simulate submission failure
+    mock_sfapi_client.compute.return_value.submit_job.side_effect = Exception("Submission failed")
+
+    with patch("orchestration.flows.bl832.nersc.time.sleep", return_value=None):
+        result = controller.reconstruct(file_path=file_path)
+
+    # Assert that the method returns False
+    assert result is False, "reconstruct should return False on submission failure."
+
+
+def test_build_multi_resolution_success(mock_sfapi_client, mock_config832):
+    """
+    Test successful multi-resolution job submission.
+    """
+    from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
+    from sfapi_client.compute import Machine
+
+    controller = NERSCTomographyHPCController(client=mock_sfapi_client, config=mock_config832)
+    file_path = "path/to/file.h5"
+
+    with patch("orchestration.flows.bl832.nersc.time.sleep", return_value=None):
+        result = controller.build_multi_resolution(file_path=file_path)
+
+    # Verify that compute was called with Machine.perlmutter
+    mock_sfapi_client.compute.assert_called_once_with(Machine.perlmutter)
+
+    # Verify that submit_job was called once
+    mock_sfapi_client.compute.return_value.submit_job.assert_called_once()
+
+    # Verify that complete was called on the job
+    mock_sfapi_client.compute.return_value.submit_job.return_value.complete.assert_called_once()
+
+    # Assert that the method returns True
+    assert result is True, "build_multi_resolution should return True on successful job completion."
+
+
+def test_build_multi_resolution_submission_failure(mock_sfapi_client, mock_config832):
+    """
+    Test multi-resolution job submission failure.
+    """
+    from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
+
+    controller = NERSCTomographyHPCController(client=mock_sfapi_client, config=mock_config832)
+    file_path = "path/to/file.h5"
+
+    # Simulate submission failure
+    mock_sfapi_client.compute.return_value.submit_job.side_effect = Exception("Submission failed")
+
+    with patch("orchestration.flows.bl832.nersc.time.sleep", return_value=None):
+        result = controller.build_multi_resolution(file_path=file_path)
+
+    # Assert that the method returns False
+    assert result is False, "build_multi_resolution should return False on submission failure."
+
+
+def test_job_submission(mock_sfapi_client):
+    """
+    Test job submission and status updates.
+    """
+    from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
+    from sfapi_client.compute import Machine
+
+    controller = NERSCTomographyHPCController(client=mock_sfapi_client, config=MagicMock())
+    file_path = "path/to/file.h5"
+
+    # Mock Path to extract file and folder names
+    with patch.object(Path, 'parent', new_callable=MagicMock) as mock_parent, \
+         patch.object(Path, 'stem', new_callable=MagicMock) as mock_stem:
+        mock_parent.name = "to"
+        mock_stem.return_value = "file"
+
+        with patch("orchestration.flows.bl832.nersc.time.sleep", return_value=None):
+            controller.reconstruct(file_path=file_path)
+
+    # Verify that compute was called with Machine.perlmutter
+    mock_sfapi_client.compute.assert_called_once_with(Machine.perlmutter)
+
+    # Verify that submit_job was called once
+    mock_sfapi_client.compute.return_value.submit_job.assert_called_once()
+
+    # Verify the returned job has the expected attributes
+    submitted_job = mock_sfapi_client.compute.return_value.submit_job.return_value
+    assert submitted_job.jobid == "12345", "Job ID should match the mock job ID."
+    assert submitted_job.state == "COMPLETED", "Job state should be COMPLETED."

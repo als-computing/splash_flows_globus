@@ -6,7 +6,6 @@ from pathlib import Path
 from prefect import flow
 import re
 import time
-from typing import Optional
 
 from authlib.jose import JsonWebKey
 from sfapi_client import Client
@@ -30,16 +29,13 @@ class NERSCTomographyHPCController(TomographyHPCController):
 
     def __init__(
         self,
-        client: Client = None,
-        config: Optional[Config832] = None
+        client: Client,
+        config: Config832
     ) -> None:
         self.client = client
+        self.config = config
 
-        if not config:
-            self.config = Config832()
-        else:
-            self.config = config
-
+    @staticmethod
     def create_sfapi_client() -> Client:
         """Create and return an NERSC client instance"""
 
@@ -191,8 +187,6 @@ date
 
         image_name = self.config.harbor_images832["multires_image"]
 
-        # TODO: fix these paths
-
         path = Path(file_path)
         folder_name = path.parent.name
         file_name = path.stem
@@ -270,6 +264,7 @@ date
 @flow(name="nersc_recon_flow")
 def nersc_recon_flow(
     file_path: str,
+    config: Config832,
 ) -> bool:
     """
     Perform tomography reconstruction on NERSC.
@@ -279,7 +274,10 @@ def nersc_recon_flow(
 
     # To do: Implement file transfers, pruning, and other necessary steps
 
-    controller = get_controller(HPC.NERSC)
+    controller = get_controller(
+        hpc_type=HPC.NERSC,
+        config=config
+    )
     nersc_reconstruction_success = controller.reconstruct(
         file_path=file_path,
     )
@@ -294,4 +292,7 @@ def nersc_recon_flow(
 
 
 if __name__ == "__main__":
-    nersc_recon_flow(file_path="dabramov/20230606_151124_jong-seto_fungal-mycelia_roll-AQ_fungi1_fast.h5")
+    nersc_recon_flow(
+        file_path="dabramov/20230606_151124_jong-seto_fungal-mycelia_roll-AQ_fungi1_fast.h5",
+        config=Config832()
+    )

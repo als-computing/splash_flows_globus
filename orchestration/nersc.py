@@ -1,3 +1,7 @@
+'''
+DEPRECATION WARNING: NerscClient is deprecated and will be removed when we refactor the ptychography code
+'''
+
 import json
 import logging
 # from pathlib import Path
@@ -18,6 +22,9 @@ JobSacct.model_rebuild()
 
 
 class NerscClient(Client):
+    '''
+    DEPRECATION WARNING: NerscClient is deprecated and will be removed when we refactor the ptychography code
+    '''
     def __init__(
         self,
         path_client_id,
@@ -69,7 +76,7 @@ class NerscClient(Client):
     ):
         self.get_client_id()
         self.get_private_key()
-        
+
     def init_directory_paths(self):
         self.home_path = f"/global/homes/{self.user().name[0]}/{self.user().name}"
         self.scratch_path = f"/pscratch/sd/{self.user().name[0]}/{self.user().name}"
@@ -86,7 +93,7 @@ class NerscClient(Client):
     def update_job_state(self):
         self.request_job_status()
         self.job_state = self.job.state
-        
+
         if self.job_state == "RUNNING":
             self.has_ran = True
         elif self.job_state == "COMPLETE":
@@ -105,4 +112,3 @@ class NerscClient(Client):
         self.update_job_id()
         # self.update_job_state()
         self.logger.info(f"Submitted job id: {self.jobid}")
-

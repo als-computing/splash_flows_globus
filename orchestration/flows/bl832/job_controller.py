@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from dotenv import load_dotenv
 from enum import Enum
 import logging
-from typing import Optional
 
 from orchestration.flows.bl832.config import Config832
 
@@ -21,7 +20,7 @@ class TomographyHPCController(ABC):
     """
     def __init__(
         self,
-        Config832: Optional[Config832] = None
+        config: Config832
     ) -> None:
         pass
 
@@ -63,7 +62,10 @@ class HPC(Enum):
     NERSC = "NERSC"
 
 
-def get_controller(hpc_type: HPC) -> TomographyHPCController:
+def get_controller(
+    hpc_type: HPC,
+    config: Config832
+) -> TomographyHPCController:
     """
     Factory function that returns an HPC controller instance for the given HPC environment.
 
@@ -74,13 +76,17 @@ def get_controller(hpc_type: HPC) -> TomographyHPCController:
     if not isinstance(hpc_type, HPC):
         raise ValueError(f"Invalid HPC type provided: {hpc_type}")
 
+    if not config:
+        raise ValueError("Config object is required.")
+
     if hpc_type == HPC.ALCF:
         from orchestration.flows.bl832.alcf import ALCFTomographyHPCController
         return ALCFTomographyHPCController()
     elif hpc_type == HPC.NERSC:
         from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
         return NERSCTomographyHPCController(
-            NERSCTomographyHPCController.create_sfapi_client()
+            client=NERSCTomographyHPCController.create_sfapi_client(),
+            config=config
         )
     else:
         raise ValueError(f"Unsupported HPC type: {hpc_type}")
