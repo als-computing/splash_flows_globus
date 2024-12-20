@@ -99,6 +99,10 @@ harbor_images832:
   recon_image: tomorecon_nersc_mpi_hdf5@sha256:cc098a2cfb6b1632ea872a202c66cb7566908da066fd8f8c123b92fa95c2a43c
   multires_image: tomorecon_nersc_mpi_hdf5@sha256:cc098a2cfb6b1632ea872a202c66cb7566908da066fd8f8c123b92fa95c2a43c
 
+ghcr_images832:
+  recon_image: ghcr.io/als-computing/microct:master
+  multires_image: ghcr.io/als-computing/microct:master
+
 prefect:
   deployments:
   - type_spec: new_file_832

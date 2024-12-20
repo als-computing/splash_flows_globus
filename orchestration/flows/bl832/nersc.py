@@ -74,10 +74,6 @@ class NERSCTomographyHPCController(TomographyHPCController):
         """
         logger.info("Starting NERSC reconstruction process.")
 
-        # Can't use this long term in production. Need to find a better way to handle credentials.
-        # Want to run this as the alsdev user
-        # username = os.getenv("NERSC_USERNAME")
-        # password = os.getenv("NERSC_PASSWORD")
         user = self.client.user()
 
         home_path = f"/global/homes/{user.name[0]}/{user.name}"
@@ -85,7 +81,8 @@ class NERSCTomographyHPCController(TomographyHPCController):
         logger.info(home_path)
         logger.info(scratch_path)
 
-        image_name = self.config.harbor_images832["recon_image"]
+        image_name = self.config.ghcr_images832["recon_image"]
+
         logger.info(image_name)
         path = Path(file_path)
         folder_name = path.parent.name
@@ -100,12 +97,6 @@ class NERSCTomographyHPCController(TomographyHPCController):
         # IMPORTANT: job script must be deindented to the leftmost column or it will fail immediately
         # Note: If q=debug, there is no minimum time limit
         # However, if q=preempt, there is a minimum time limit of 2 hours. Otherwise the job won't run.
-
-        # If the image has not been pulled before,
-        # then you must login to Harbor first (hopefully we can get a robot account)
-        # Looking into using github actions to build the image and host it on on github instead
-        # srun podman-hpc login registry.nersc.gov --username {username} --password {password}
-# SBATCH -q debug
 
         job_script = f"""#!/bin/bash
 #SBATCH -q debug
@@ -125,9 +116,8 @@ srun podman-hpc run \
 --volume {home_path}/tomo_recon_repo/microct/legacy/sfapi_reconstruction.py:/alsuser/sfapi_reconstruction.py \
 --volume {scratch_path}/microctdata:/alsdata \
 --volume {scratch_path}/microctdata:/alsuser/ \
-registry.nersc.gov/als/{image_name} \
-bash -c "python -m pip install numpy==1.23.2 && \
-python sfapi_reconstruction.py {file_name} {folder_name}"
+{image_name} \
+bash -c "python sfapi_reconstruction.py {file_name} {folder_name}"
 date
 """
 
@@ -175,9 +165,6 @@ date
     ) -> bool:
         """Use NERSC to make multiresolution version of tomography results."""
 
-        # username = os.getenv("NERSC_USERNAME")
-        # password = os.getenv("NERSC_PASSWORD")
-
         user = self.client.user()
 
         home_path = f"/global/homes/{user.name[0]}/{user.name}"
@@ -185,7 +172,7 @@ date
         logger.info(home_path)
         logger.info(scratch_path)
 
-        image_name = self.config.harbor_images832["multires_image"]
+        image_name = self.config.ghcr_images832["multires_image"]
 
         path = Path(file_path)
         folder_name = path.parent.name
@@ -193,9 +180,6 @@ date
 
         recon_path = f"scratch/{folder_name}/rec{file_name}/"
         raw_path = f"{folder_name}/{file_name}.h5"
-
-        # Need to update this script:
-        # rebuild image with dependencies
 
         # IMPORTANT: job script must be deindented to the leftmost column or it will fail immediately
         job_script = f"""#!/bin/bash
@@ -216,10 +200,8 @@ srun podman-hpc run --volume {home_path}/tomo_recon_repo/microct/legacy/tiff_to_
 --volume {home_path}/tomo_recon_repo/microct/legacy/input.txt:/alsuser/input.txt \
 --volume {scratch_path}/microctdata:/alsdata \
 --volume {scratch_path}/microctdata:/alsuser/ \
-registry.nersc.gov/als/{image_name} \
-bash -c "python -m pip show ngff_zarr || python -m pip install ngff_zarr && \
-python -m pip show dask_image || python -m pip install dask_image && \
-python tiff_to_zarr.py {recon_path} --raw_file {raw_path}"
+{image_name} \
+bash -c "python tiff_to_zarr.py {recon_path} --raw_file {raw_path}"
 
 date
 """
