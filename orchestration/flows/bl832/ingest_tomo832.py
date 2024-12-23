@@ -27,8 +27,8 @@ from orchestration.flows.scicat.utils import (
     Severity
 )
 
-DEFAULT_USER = "8.3.2" # In case there's not proposal number
-UNKNWON_EMAIL = "unknown@example.com"
+DEFAULT_USER = "8.3.2"  # In case there's not proposal number
+UNKNOWN_EMAIL = "unknown@example.com"
 ingest_spec = "als832_dx_3"
 
 logger = logging.getLogger("scicat_ingest")
@@ -102,7 +102,7 @@ def ingest(
         upload_data_block(
             scicat_client,
             file_path,
-            dataset_id, 
+            dataset_id,
             INGEST_STORAGE_ROOT_PATH,
             INGEST_SOURCE_ROOT_PATH)
 
@@ -134,7 +134,7 @@ def upload_raw_dataset(
     dataset = RawDataset(
         owner=scicat_metadata.get("/measurement/sample/experiment/pi") or "Unknown",
         contactEmail=clean_email(scicat_metadata.get("/measurement/sample/experimenter/email"))
-        or "Unknown",
+        or "unknown@example.com",
         creationLocation=scicat_metadata.get("/measurement/instrument/instrument_name")
         or "Unknown",
         datasetName=file_name,
@@ -190,7 +190,6 @@ def upload_data_block(
         dataFileList=datafiles
     )
     return scicat_client.upload_dataset_origdatablock(dataset_id, datablock)
-
 
 
 def upload_attachment(
@@ -272,7 +271,7 @@ def clean_email(email: str):
         if not email or email.upper() == "NONE":
             # this is a brutal case, but the beamline sometimes puts in "None" and
             # the new scicat backend hates that.
-            return UNKNWON_EMAIL
+            return UNKNOWN_EMAIL
         return email.replace(" ", "").replace(",", "").replace("'", "")
     return None
 
