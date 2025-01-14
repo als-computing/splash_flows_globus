@@ -13,7 +13,7 @@ from sfapi_client.compute import Machine
 
 from orchestration.flows.bl832.config import Config832
 from orchestration.flows.bl832.job_controller import get_controller, HPC, TomographyHPCController
-
+# from orchestration.prefect import schedule_prefect_flow
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -76,14 +76,22 @@ class NERSCTomographyHPCController(TomographyHPCController):
 
         user = self.client.user()
 
-        home_path = f"/global/homes/{user.name[0]}/{user.name}"
-        scratch_path = f"/pscratch/sd/{user.name[0]}/{user.name}"
-        logger.info(home_path)
-        logger.info(scratch_path)
+        raw_path = self.config.nersc832_alsdev_raw.root_path
 
-        image_name = self.config.ghcr_images832["recon_image"]
+        recon_image = self.config.ghcr_images832["recon_image"]
+        logger.info(f"{recon_image=}")
 
-        logger.info(image_name)
+        recon_scripts_dir = self.config.nersc832_alsdev_recon_scripts.root_path
+        logger.info(f"{recon_scripts_dir=}")
+
+        scratch_path = self.config.nersc832_alsdev_scratch.root_path
+        logger.info(f"{scratch_path=}")
+
+        # home_path = f"/global/homes/{user.name[0]}/{user.name}"
+        pscratch_path = f"/pscratch/sd/{user.name[0]}/{user.name}"
+        # logger.info(home_path)
+        # logger.info(scratch_path)
+
         path = Path(file_path)
         folder_name = path.parent.name
         if not folder_name:
@@ -99,12 +107,12 @@ class NERSCTomographyHPCController(TomographyHPCController):
         # However, if q=preempt, there is a minimum time limit of 2 hours. Otherwise the job won't run.
 
         job_script = f"""#!/bin/bash
-#SBATCH -q debug
+#SBATCH -q realtime
 #SBATCH -A als
 #SBATCH -C cpu
-#SBATCH --job-name=tomo_recon_test-0
-#SBATCH --output={scratch_path}/nerscClient-test/%x_%j.out
-#SBATCH --error={scratch_path}/nerscClient-test/%x_%j.err
+#SBATCH --job-name=tomo_recon_{folder_name}_{file_name}
+#SBATCH --output={pscratch_path}/tomo_recon_logs/%x_%j.out
+#SBATCH --error={pscratch_path}/tomo_recon_logs/%x_%j.err
 #SBATCH -N 1
 #SBATCH --ntasks-per-node 1
 #SBATCH --cpus-per-task 64
@@ -112,11 +120,28 @@ class NERSCTomographyHPCController(TomographyHPCController):
 #SBATCH --exclusive
 
 date
+echo "Creating directory {pscratch_path}/bl832/raw/{folder_name}"
+mkdir -p {pscratch_path}/bl832/raw/{folder_name}
+mkdir -p {pscratch_path}/bl832/scratch/{folder_name}
+
+echo "Copying file {raw_path}/{folder_name}/{file_name} to {pscratch_path}/bl832/raw/{folder_name}/"
+cp {raw_path}/{folder_name}/{file_name} {pscratch_path}/bl832/raw/{folder_name}
+if [ $? -ne 0 ]; then
+    echo "Failed to copy data to pscratch."
+    exit 1
+fi
+
+chmod -R 2775 {pscratch_path}/bl832
+
+echo "Verifying copied files..."
+ls -l {pscratch_path}/bl832/raw/{folder_name}/
+
+echo "Running reconstruction container..."
 srun podman-hpc run \
---volume {home_path}/tomo_recon_repo/microct/legacy/sfapi_reconstruction.py:/alsuser/sfapi_reconstruction.py \
---volume {scratch_path}/microctdata:/alsdata \
---volume {scratch_path}/microctdata:/alsuser/ \
-{image_name} \
+--volume {recon_scripts_dir}/sfapi_reconstruction.py:/alsuser/sfapi_reconstruction.py \
+--volume {pscratch_path}/bl832:/alsdata \
+--volume {pscratch_path}/bl832:/alsuser/ \
+{recon_image} \
 bash -c "python sfapi_reconstruction.py {file_name} {folder_name}"
 date
 """
@@ -165,30 +190,40 @@ date
     ) -> bool:
         """Use NERSC to make multiresolution version of tomography results."""
 
+        logger.info("Starting NERSC multiresolution process.")
+
         user = self.client.user()
 
-        home_path = f"/global/homes/{user.name[0]}/{user.name}"
-        scratch_path = f"/pscratch/sd/{user.name[0]}/{user.name}"
-        logger.info(home_path)
-        logger.info(scratch_path)
+        multires_image = self.config.ghcr_images832["multires_image"]
+        logger.info(f"{multires_image=}")
 
-        image_name = self.config.ghcr_images832["multires_image"]
+        recon_scripts_dir = self.config.nersc832_alsdev_recon_scripts.root_path
+        logger.info(f"{recon_scripts_dir=}")
+
+        scratch_path = self.config.nersc832_alsdev_scratch.root_path
+        logger.info(f"{scratch_path=}")
+
+        pscratch_path = f"/pscratch/sd/{user.name[0]}/{user.name}"
+        logger.info(f"{pscratch_path=}")
 
         path = Path(file_path)
         folder_name = path.parent.name
         file_name = path.stem
 
         recon_path = f"scratch/{folder_name}/rec{file_name}/"
-        raw_path = f"{folder_name}/{file_name}.h5"
+        logger.info(f"{recon_path=}")
+
+        raw_path = f"raw/{folder_name}/{file_name}.h5"
+        logger.info(f"{raw_path=}")
 
         # IMPORTANT: job script must be deindented to the leftmost column or it will fail immediately
         job_script = f"""#!/bin/bash
-#SBATCH -q debug
+#SBATCH -q realtime
 #SBATCH -A als
 #SBATCH -C cpu
-#SBATCH --job-name=tomo_multires_test-0
-#SBATCH --output={scratch_path}/nerscClient-test/%x_%j.out
-#SBATCH --error={scratch_path}/nerscClient-test/%x_%j.err
+#SBATCH --job-name=tomo_multires_{folder_name}_{file_name}
+#SBATCH --output={pscratch_path}/tomo_recon_logs/%x_%j.out
+#SBATCH --error={pscratch_path}/tomo_recon_logs/%x_%j.err
 #SBATCH -N 1
 #SBATCH --ntasks-per-node 1
 #SBATCH --cpus-per-task 64
@@ -196,15 +231,18 @@ date
 #SBATCH --exclusive
 
 date
-srun podman-hpc run --volume {home_path}/tomo_recon_repo/microct/legacy/tiff_to_zarr.py:/alsuser/tiff_to_zarr.py \
---volume {home_path}/tomo_recon_repo/microct/legacy/input.txt:/alsuser/input.txt \
---volume {scratch_path}/microctdata:/alsdata \
---volume {scratch_path}/microctdata:/alsuser/ \
-{image_name} \
+
+echo "Running multires container..."
+srun podman-hpc run \
+--volume {recon_scripts_dir}/tiff_to_zarr.py:/alsuser/tiff_to_zarr.py \
+--volume {pscratch_path}/bl832:/alsdata \
+--volume {pscratch_path}/bl832:/alsuser/ \
+{multires_image} \
 bash -c "python tiff_to_zarr.py {recon_path} --raw_file {raw_path}"
 
 date
 """
+
         try:
             logger.info("Submitting Tiff to Zarr job script to Perlmutter.")
             perlmutter = self.client.compute(Machine.perlmutter)
@@ -254,8 +292,6 @@ def nersc_recon_flow(
     :param file_path: Path to the file to reconstruct.
     """
 
-    # To do: Implement file transfers, pruning, and other necessary steps
-
     controller = get_controller(
         hpc_type=HPC.NERSC,
         config=config
@@ -266,6 +302,40 @@ def nersc_recon_flow(
     nersc_multi_res_success = controller.build_multi_resolution(
         file_path=file_path,
     )
+
+    nersc_reconstruction_success = True
+
+    # TODO: Transfer reconstructed files from pscratch to /global/cfs/...8.3.2/scratch/...
+
+    # TODO: Transfer files to data832
+
+    # TODO: Schedule pruning
+    # data832/scratch : 14 days
+    # nersc/pscratch : 1 day
+    # nersc832/scratch : never?
+
+    # source_endpoint = config.data832_scratch
+    # check_endpoint = config.nersc832_alsdev_scratch
+    # location = "data832_scratch"
+    # schedule_days = 35
+    # try:
+    #     flow_name = f"delete {location}: {Path(file_path).name}"
+    #     schedule_prefect_flow(
+    #         deployment_name=f"prune_{location}/prune_{location}",
+    #         flow_run_name=flow_name,
+    #         parameters={
+    #             "relative_path": file_path,
+    #             "source_endpoint": source_endpoint,
+    #             "check_endpoint": check_endpoint
+    #         },
+    #         duration_from_now=schedule_days
+    #     )
+    #     return True
+    # except Exception as e:
+    #     logger.error(f"Failed to schedule prune task: {e}")
+    #     return False
+
+    # TODO: Ingest into SciCat
 
     if nersc_reconstruction_success and nersc_multi_res_success:
         return True

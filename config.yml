@@ -48,12 +48,6 @@ globus:
       uuid: 9032dd3a-e841-4687-a163-2720da731b5b
       name: alcf_home832
 
-    nersc_test:
-      root_path: /global/cfs/cdirs/als/data_mover/share/dabramov
-      uri: nersc.gov
-      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
-      name: nersc_test
-
     nersc_alsdev:
       root_path: /global/homes/a/alsdev/test_directory/
       uri: nersc.gov
@@ -71,6 +65,12 @@ globus:
       uri: nersc.gov
       uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
       name: nersc832_alsdev_scratch
+
+    nersc832_alsdev_recon_scripts:
+      root_path: /global/cfs/cdirs/als/data_mover/8.3.2/tomography_reconstruction_scripts
+      uri: nersc.gov
+      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
+      name: nersc832_alsdev_recon_scripts
 
     nersc832:
       root_path: /global/cfs/cdirs/als/data_mover/8.3.2
