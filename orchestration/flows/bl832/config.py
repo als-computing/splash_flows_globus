@@ -17,6 +17,7 @@ class Config832:
         self.nersc_alsdev = self.endpoints["nersc_alsdev"]
         self.nersc832_alsdev_raw = self.endpoints["nersc832_alsdev_raw"]
         self.nersc832_alsdev_scratch = self.endpoints["nersc832_alsdev_scratch"]
+        self.nersc832_alsdev_pscratch = self.endpoints["nersc832_alsdev_pscratch"]
         self.nersc832_alsdev_recon_scripts = self.endpoints["nersc832_alsdev_recon_scripts"]
         self.alcf832_raw = self.endpoints["alcf832_raw"]
         self.alcf832_scratch = self.endpoints["alcf832_scratch"]

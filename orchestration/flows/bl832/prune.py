@@ -143,5 +143,19 @@ def prune_nersc832_alsdev_scratch(
         config=config)
 
 
+@flow(name="prune_nersc832_alsdev_pscratch")
+def prune_nersc832_alsdev_pscratch(
+        relative_path: str,
+        source_endpoint: GlobusEndpoint,
+        check_endpoint: Union[GlobusEndpoint, None] = None,
+        config=None,
+):
+    prune_files(
+        relative_path=relative_path,
+        source_endpoint=source_endpoint,
+        check_endpoint=check_endpoint,
+        config=config)
+
+
 if __name__ == "__main__":
     prune_nersc832_alsdev_scratch("BLS-00564_dyparkinson/")

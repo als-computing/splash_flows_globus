@@ -1,23 +1,55 @@
+import datetime
 from dotenv import load_dotenv
 import json
 import logging
 import os
 from pathlib import Path
-from prefect import flow
 import re
 import time
 
 from authlib.jose import JsonWebKey
+from globus_sdk import TransferClient
+from prefect import flow, task
+from prefect.blocks.system import JSON
 from sfapi_client import Client
 from sfapi_client.compute import Machine
 
 from orchestration.flows.bl832.config import Config832
 from orchestration.flows.bl832.job_controller import get_controller, HPC, TomographyHPCController
-# from orchestration.prefect import schedule_prefect_flow
+from orchestration.globus.transfer import GlobusEndpoint, start_transfer
+from orchestration.prefect import schedule_prefect_flow
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 load_dotenv()
+
+
+@task(name="transfer_data_at_nersc")
+def transfer_data_at_nersc(
+    file_path: str,
+    transfer_client: TransferClient,
+    nersc_source: GlobusEndpoint,
+    nersc_destination: GlobusEndpoint,
+):
+    # if source_file begins with "/", it will mess up os.path.join
+    if file_path[0] == "/":
+        file_path = file_path[1:]
+    source_path = os.path.join(nersc_source.root_path, file_path)
+    dest_path = os.path.join(nersc_destination.root_path, file_path)
+
+    logger.info(f"Transferring {dest_path} data832 to nersc")
+
+    success = start_transfer(
+        transfer_client,
+        nersc_source,
+        source_path,
+        nersc_destination,
+        dest_path,
+        max_wait_seconds=600,
+        logger=logger,
+    )
+
+    return success
 
 
 class NERSCTomographyHPCController(TomographyHPCController):
@@ -77,6 +109,7 @@ class NERSCTomographyHPCController(TomographyHPCController):
         user = self.client.user()
 
         raw_path = self.config.nersc832_alsdev_raw.root_path
+        logger.info(f"{raw_path=}")
 
         recon_image = self.config.ghcr_images832["recon_image"]
         logger.info(f"{recon_image=}")
@@ -87,10 +120,8 @@ class NERSCTomographyHPCController(TomographyHPCController):
         scratch_path = self.config.nersc832_alsdev_scratch.root_path
         logger.info(f"{scratch_path=}")
 
-        # home_path = f"/global/homes/{user.name[0]}/{user.name}"
         pscratch_path = f"/pscratch/sd/{user.name[0]}/{user.name}"
-        # logger.info(home_path)
-        # logger.info(scratch_path)
+        logger.info(f"{pscratch_path=}")
 
         path = Path(file_path)
         folder_name = path.parent.name
@@ -120,27 +151,27 @@ class NERSCTomographyHPCController(TomographyHPCController):
 #SBATCH --exclusive
 
 date
-echo "Creating directory {pscratch_path}/bl832/raw/{folder_name}"
-mkdir -p {pscratch_path}/bl832/raw/{folder_name}
-mkdir -p {pscratch_path}/bl832/scratch/{folder_name}
+echo "Creating directory {pscratch_path}/8.3.2/raw/{folder_name}"
+mkdir -p {pscratch_path}/8.3.2/raw/{folder_name}
+mkdir -p {pscratch_path}/8.3.2/scratch/{folder_name}
 
-echo "Copying file {raw_path}/{folder_name}/{file_name} to {pscratch_path}/bl832/raw/{folder_name}/"
-cp {raw_path}/{folder_name}/{file_name} {pscratch_path}/bl832/raw/{folder_name}
+echo "Copying file {raw_path}/{folder_name}/{file_name} to {pscratch_path}/8.3.2/raw/{folder_name}/"
+cp {raw_path}/{folder_name}/{file_name} {pscratch_path}/8.3.2/raw/{folder_name}
 if [ $? -ne 0 ]; then
     echo "Failed to copy data to pscratch."
     exit 1
 fi
 
-chmod -R 2775 {pscratch_path}/bl832
+chmod -R 2775 {pscratch_path}/8.3.2
 
 echo "Verifying copied files..."
-ls -l {pscratch_path}/bl832/raw/{folder_name}/
+ls -l {pscratch_path}/8.3.2/raw/{folder_name}/
 
 echo "Running reconstruction container..."
 srun podman-hpc run \
 --volume {recon_scripts_dir}/sfapi_reconstruction.py:/alsuser/sfapi_reconstruction.py \
---volume {pscratch_path}/bl832:/alsdata \
---volume {pscratch_path}/bl832:/alsuser/ \
+--volume {pscratch_path}/8.3.2:/alsdata \
+--volume {pscratch_path}/8.3.2:/alsuser/ \
 {recon_image} \
 bash -c "python sfapi_reconstruction.py {file_name} {folder_name}"
 date
@@ -235,14 +266,13 @@ date
 echo "Running multires container..."
 srun podman-hpc run \
 --volume {recon_scripts_dir}/tiff_to_zarr.py:/alsuser/tiff_to_zarr.py \
---volume {pscratch_path}/bl832:/alsdata \
---volume {pscratch_path}/bl832:/alsuser/ \
+--volume {pscratch_path}/8.3.2:/alsdata \
+--volume {pscratch_path}/8.3.2:/alsuser/ \
 {multires_image} \
 bash -c "python tiff_to_zarr.py {recon_path} --raw_file {raw_path}"
 
 date
 """
-
         try:
             logger.info("Submitting Tiff to Zarr job script to Perlmutter.")
             perlmutter = self.client.compute(Machine.perlmutter)
@@ -259,6 +289,29 @@ date
 
             job.complete()  # Wait until the job completes
             logger.info("Reconstruction job completed successfully.")
+
+            # defining this GlobusEndpoint here rather than config.yaml since the root path depends on the SFAPI user name
+            # using the same uuid from another endpoint because it's the same alsdev collection
+            nersc832_pscratch_endpoint = GlobusEndpoint(
+                uuid=self.config.nersc832_alsdev_scratch.uuid,
+                uri=self.config.nersc832_alsdev_scratch.uri,
+                root_path=f"{pscratch_path}/scratch",
+                name="nersc832_pscratch"
+            )
+
+            # Working on a permission denied error when transferring
+            relative_recon_path = os.path.relpath(recon_path, "scratch")
+            transfer_data_at_nersc(
+                file_path=relative_recon_path,
+                transfer_client=self.config.tc,
+                nersc_source=nersc832_pscratch_endpoint,
+                nersc_destination=self.config.nersc832_alsdev_scratch)
+            transfer_data_at_nersc(
+                file_path=f"{relative_recon_path}.zarr",
+                transfer_client=self.config.tc,
+                nersc_source=nersc832_pscratch_endpoint,
+                nersc_destination=self.config.nersc832_alsdev_scratch
+            )
             return True
 
         except Exception as e:
@@ -279,6 +332,56 @@ date
                     return False
             else:
                 return False
+
+
+def schedule_pruning(config: Config832, file_path: str) -> bool:
+    # data832/scratch : 14 days
+    # nersc/pscratch : 1 day
+    # nersc832/scratch : never?
+
+    pruning_config = JSON.load("pruning-config").value
+    data832_delay = datetime.timedelta(days=pruning_config["delete_data832_files_after_days"])
+    nersc832_delay = datetime.timedelta(days=pruning_config["delete_nersc832_files_after_days"])
+    
+    # Delete from data832_scratch
+    try:
+        source_endpoint = config.data832_scratch
+        check_endpoint = config.nersc832_alsdev_scratch
+        location = "data832_scratch"
+
+        flow_name = f"delete {location}: {Path(file_path).name}"
+        schedule_prefect_flow(
+            deployment_name=f"prune_{location}/prune_{location}",
+            flow_run_name=flow_name,
+            parameters={
+                "relative_path": file_path,
+                "source_endpoint": source_endpoint,
+                "check_endpoint": check_endpoint
+            },
+            duration_from_now=data832_delay
+        )
+    except Exception as e:
+        logger.error(f"Failed to schedule prune task: {e}")
+
+    # Delete from nersc832_pscratch
+    try:
+        source_endpoint = config.nersc832_alsdev_pscratch
+        check_endpoint = None
+        location = "nersc832_alsdev_pscratch"
+
+        flow_name = f"delete {location}: {Path(file_path).name}"
+        schedule_prefect_flow(
+            deployment_name=f"prune_{location}/prune_{location}",
+            flow_run_name=flow_name,
+            parameters={
+                "relative_path": file_path,
+                "source_endpoint": source_endpoint,
+                "check_endpoint": check_endpoint
+            },
+            duration_from_now=nersc832_delay
+        )
+    except Exception as e:
+        logger.error(f"Failed to schedule prune task: {e}")
 
 
 @flow(name="nersc_recon_flow")
@@ -303,37 +406,9 @@ def nersc_recon_flow(
         file_path=file_path,
     )
 
-    nersc_reconstruction_success = True
-
-    # TODO: Transfer reconstructed files from pscratch to /global/cfs/...8.3.2/scratch/...
-
     # TODO: Transfer files to data832
 
-    # TODO: Schedule pruning
-    # data832/scratch : 14 days
-    # nersc/pscratch : 1 day
-    # nersc832/scratch : never?
-
-    # source_endpoint = config.data832_scratch
-    # check_endpoint = config.nersc832_alsdev_scratch
-    # location = "data832_scratch"
-    # schedule_days = 35
-    # try:
-    #     flow_name = f"delete {location}: {Path(file_path).name}"
-    #     schedule_prefect_flow(
-    #         deployment_name=f"prune_{location}/prune_{location}",
-    #         flow_run_name=flow_name,
-    #         parameters={
-    #             "relative_path": file_path,
-    #             "source_endpoint": source_endpoint,
-    #             "check_endpoint": check_endpoint
-    #         },
-    #         duration_from_now=schedule_days
-    #     )
-    #     return True
-    # except Exception as e:
-    #     logger.error(f"Failed to schedule prune task: {e}")
-    #     return False
+    schedule_pruning(config=config, file_path=file_path)
 
     # TODO: Ingest into SciCat
 
