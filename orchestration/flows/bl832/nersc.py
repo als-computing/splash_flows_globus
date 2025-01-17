@@ -8,15 +8,16 @@ import re
 import time
 
 from authlib.jose import JsonWebKey
-from globus_sdk import TransferClient
-from prefect import flow, task
+# from globus_sdk import TransferClient
+from prefect import flow  # , task
 from prefect.blocks.system import JSON
 from sfapi_client import Client
 from sfapi_client.compute import Machine
 
 from orchestration.flows.bl832.config import Config832
 from orchestration.flows.bl832.job_controller import get_controller, HPC, TomographyHPCController
-from orchestration.globus.transfer import GlobusEndpoint, start_transfer
+from orchestration.globus.transfer import GlobusEndpoint
+from orchestration.transfer_controller import get_transfer_controller, CopyMethod
 from orchestration.prefect import schedule_prefect_flow
 
 logger = logging.getLogger(__name__)
@@ -24,32 +25,32 @@ logger.setLevel(logging.INFO)
 load_dotenv()
 
 
-@task(name="transfer_data_at_nersc")
-def transfer_data_at_nersc(
-    file_path: str,
-    transfer_client: TransferClient,
-    nersc_source: GlobusEndpoint,
-    nersc_destination: GlobusEndpoint,
-):
-    # if source_file begins with "/", it will mess up os.path.join
-    if file_path[0] == "/":
-        file_path = file_path[1:]
-    source_path = os.path.join(nersc_source.root_path, file_path)
-    dest_path = os.path.join(nersc_destination.root_path, file_path)
+# @task(name="transfer_data_at_nersc")
+# def transfer_data_at_nersc(
+#     file_path: str,
+#     transfer_client: TransferClient,
+#     nersc_source: GlobusEndpoint,
+#     nersc_destination: GlobusEndpoint,
+# ):
+#     # if source_file begins with "/", it will mess up os.path.join
+#     if file_path[0] == "/":
+#         file_path = file_path[1:]
+#     source_path = os.path.join(nersc_source.root_path, file_path)
+#     dest_path = os.path.join(nersc_destination.root_path, file_path)
 
-    logger.info(f"Transferring {dest_path} data832 to nersc")
+#     logger.info(f"Transferring {dest_path} data832 to nersc")
 
-    success = start_transfer(
-        transfer_client,
-        nersc_source,
-        source_path,
-        nersc_destination,
-        dest_path,
-        max_wait_seconds=600,
-        logger=logger,
-    )
+#     success = start_transfer(
+#         transfer_client,
+#         nersc_source,
+#         source_path,
+#         nersc_destination,
+#         dest_path,
+#         max_wait_seconds=600,
+#         logger=logger,
+#     )
 
-    return success
+#     return success
 
 
 class NERSCTomographyHPCController(TomographyHPCController):
@@ -295,23 +296,41 @@ date
             nersc832_pscratch_endpoint = GlobusEndpoint(
                 uuid=self.config.nersc832_alsdev_scratch.uuid,
                 uri=self.config.nersc832_alsdev_scratch.uri,
-                root_path=f"{pscratch_path}/scratch",
+                root_path=f"{pscratch_path}/8.3.2/scratch",
                 name="nersc832_pscratch"
             )
 
             # Working on a permission denied error when transferring
             relative_recon_path = os.path.relpath(recon_path, "scratch")
-            transfer_data_at_nersc(
-                file_path=relative_recon_path,
-                transfer_client=self.config.tc,
-                nersc_source=nersc832_pscratch_endpoint,
-                nersc_destination=self.config.nersc832_alsdev_scratch)
-            transfer_data_at_nersc(
-                file_path=f"{relative_recon_path}.zarr",
-                transfer_client=self.config.tc,
-                nersc_source=nersc832_pscratch_endpoint,
-                nersc_destination=self.config.nersc832_alsdev_scratch
+
+            transfer_controller = get_transfer_controller(
+                transfer_type=CopyMethod.GLOBUS,
+                config=self.config
             )
+
+            transfer_controller.copy(
+                file_path=relative_recon_path,
+                source=nersc832_pscratch_endpoint,
+                destination=self.config.nersc832_alsdev_scratch
+            )
+
+            transfer_controller.copy(
+                file_path=f"{relative_recon_path}.zarr",
+                source=nersc832_pscratch_endpoint,
+                destination=self.config.nersc832_alsdev_scratch
+            )
+
+            # transfer_data_at_nersc(
+            #     file_path=relative_recon_path,
+            #     transfer_client=self.config.tc,
+            #     nersc_source=nersc832_pscratch_endpoint,
+            #     nersc_destination=self.config.nersc832_alsdev_scratch)
+            # transfer_data_at_nersc(
+            #     file_path=f"{relative_recon_path}.zarr",
+            #     transfer_client=self.config.tc,
+            #     nersc_source=nersc832_pscratch_endpoint,
+            #     nersc_destination=self.config.nersc832_alsdev_scratch
+            # )
             return True
 
         except Exception as e:
