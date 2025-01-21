@@ -60,6 +60,7 @@ class HPC(Enum):
     """
     ALCF = "ALCF"
     NERSC = "NERSC"
+    OLCF = "OLCF"
 
 
 def get_controller(
@@ -88,6 +89,9 @@ def get_controller(
             client=NERSCTomographyHPCController.create_sfapi_client(),
             config=config
         )
+    elif hpc_type == HPC.OLCF:
+        # TODO: Implement OLCF controller
+        pass
     else:
         raise ValueError(f"Unsupported HPC type: {hpc_type}")
 

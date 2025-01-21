@@ -66,11 +66,17 @@ globus:
       uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
       name: nersc832_alsdev_scratch
 
-    nersc832_alsdev_pscratch:
-      root_path: /pscratch/sd/a/alsdev/8.3.2
+    nersc832_alsdev_pscratch_raw:
+      root_path: /pscratch/sd/a/alsdev/8.3.2/raw
       uri: nersc.gov
       uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
-      name: nersc832_alsdev_pscratch
+      name: nersc832_alsdev_pscratch_raw
+
+    nersc832_alsdev_pscratch_scratch:
+      root_path: /pscratch/sd/a/alsdev/8.3.2/scratch
+      uri: nersc.gov
+      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
+      name: nersc832_alsdev_pscratch_scratch
 
     nersc832_alsdev_recon_scripts:
       root_path: /global/cfs/cdirs/als/data_mover/8.3.2/tomography_reconstruction_scripts

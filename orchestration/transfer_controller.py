@@ -114,7 +114,7 @@ class GlobusTransfer(TransferController[GlobusEndpoint]):
         logger.info(f"Transferring {source_path} to {dest_path}")
         # Start the timer
         start_time = time.time()
-
+        success = False
         try:
             success = start_transfer(
                 transfer_client=self.config.tc,
@@ -132,7 +132,7 @@ class GlobusTransfer(TransferController[GlobusEndpoint]):
             return success
         except globus_sdk.services.transfer.errors.TransferAPIError as e:
             logger.error(f"Failed to submit transfer: {e}")
-            return False
+            return success
         finally:
             # Stop the timer and calculate the duration
             elapsed_time = time.time() - start_time
