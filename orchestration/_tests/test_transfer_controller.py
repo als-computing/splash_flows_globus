@@ -1,37 +1,90 @@
 # test_transfer_controller.py
 
 import pytest
-import globus_sdk
+from pytest_mock import MockFixture
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
-from orchestration.flows.bl832.config import Config832
-from orchestration.transfer_controller import (
-    FileSystemEndpoint,
-    GlobusTransferController,
-    SimpleTransferController,
-    get_transfer_controller,
-    CopyMethod,
-)
-from orchestration.globus.transfer import GlobusEndpoint
+import globus_sdk
+from prefect.blocks.system import Secret
+from prefect.testing.utilities import prefect_test_harness
+
+from .test_globus import MockTransferClient
+
+
+@pytest.fixture(autouse=True, scope="session")
+def prefect_test_fixture():
+    """
+    A pytest fixture that automatically sets up and tears down the Prefect test harness
+    for the entire test session. It creates and saves test secrets and configurations
+    required for Globus integration.
+
+    Yields:
+        None
+    """
+    with prefect_test_harness():
+        # Create ephemeral secrets in the local Prefect test database
+        globus_client_id = Secret(value=str(uuid4()))
+        globus_client_id.save(name="globus-client-id")
+
+        globus_client_secret = Secret(value=str(uuid4()))
+        globus_client_secret.save(name="globus-client-secret")
+
+        yield
+
+
+@pytest.fixture(scope="session")
+def transfer_controller_module():
+    """
+    Defer importing orchestration.transfer_controller until after
+    the prefect_test_fixture is loaded. This prevents Prefect from
+    trying to load secrets at import time.
+    """
+    from orchestration.transfer_controller import (
+        FileSystemEndpoint,
+        GlobusTransferController,
+        SimpleTransferController,
+        get_transfer_controller,
+        CopyMethod,
+    )
+    return {
+        "FileSystemEndpoint": FileSystemEndpoint,
+        "GlobusTransferController": GlobusTransferController,
+        "SimpleTransferController": SimpleTransferController,
+        "get_transfer_controller": get_transfer_controller,
+        "CopyMethod": CopyMethod,
+    }
+
+
+class MockEndpoint:
+    def __init__(self, root_path, uuid_value=None):
+        self.root_path = root_path
+        self.uuid = uuid_value or str(uuid4())
+        self.uri = f"mock_endpoint_uri_{self.uuid}"
 
 
 @pytest.fixture
 def mock_config832():
     """
-    A pytest fixture that provides a mocked Config832 object
-    with a mocked TransferClient (tc).
+    Mock the Config832 class to provide necessary configurations.
     """
-    mock_config = MagicMock(spec=Config832)
-    # Mock the Globus transfer client
-    mock_config.tc = MagicMock(name="MockTransferClient")
-    return mock_config
+    with patch("orchestration.flows.bl832.nersc.Config832") as MockConfig:
+        mock_config = MockConfig.return_value
+        mock_config.endpoints = {
+            "alcf832_raw": MockEndpoint("/alcf832_raw"),
+        }
+        mock_config.tc = MockTransferClient()
+        yield mock_config
 
 
 @pytest.fixture
 def mock_globus_endpoint():
     """
     A pytest fixture that returns a mocked GlobusEndpoint.
+    If your orchestration.globus.transfer also loads secrets at import,
+    you may need to similarly defer that import behind another fixture.
     """
+    from orchestration.globus.transfer import GlobusEndpoint
     endpoint = GlobusEndpoint(
         name="mock_globus_endpoint",
         root_path="/mock_globus_root/",
@@ -42,10 +95,11 @@ def mock_globus_endpoint():
 
 
 @pytest.fixture
-def mock_file_system_endpoint():
+def mock_file_system_endpoint(transfer_controller_module):
     """
     A pytest fixture that returns a FileSystemEndpoint instance.
     """
+    FileSystemEndpoint = transfer_controller_module["FileSystemEndpoint"]
     endpoint = FileSystemEndpoint(
         name="mock_filesystem_endpoint",
         root_path="/mock_fs_root"
@@ -53,37 +107,38 @@ def mock_file_system_endpoint():
     return endpoint
 
 
+class MockSecret:
+    value = str(uuid4())
+
+
 # --------------------------------------------------------------------------
 # Tests for get_transfer_controller
 # --------------------------------------------------------------------------
-def test_get_transfer_controller_globus(mock_config832):
-    """
-    Test that get_transfer_controller returns a GlobusTransferController when
-    the transfer type is CopyMethod.GLOBUS.
-    """
+
+def test_get_transfer_controller_globus(mock_config832, transfer_controller_module):
+    CopyMethod = transfer_controller_module["CopyMethod"]
+    get_transfer_controller = transfer_controller_module["get_transfer_controller"]
+    GlobusTransferController = transfer_controller_module["GlobusTransferController"]
+
     controller = get_transfer_controller(CopyMethod.GLOBUS, mock_config832)
     assert isinstance(controller, GlobusTransferController), (
-        "get_transfer_controller should return a GlobusTransferController "
-        "instance for GLOBUS transfer."
+        "Expected GlobusTransferController for GLOBUS transfer type."
     )
 
 
-def test_get_transfer_controller_simple(mock_config832):
-    """
-    Test that get_transfer_controller returns a SimpleTransferController when
-    the transfer type is CopyMethod.SIMPLE.
-    """
+def test_get_transfer_controller_simple(mock_config832, transfer_controller_module):
+    CopyMethod = transfer_controller_module["CopyMethod"]
+    get_transfer_controller = transfer_controller_module["get_transfer_controller"]
+    SimpleTransferController = transfer_controller_module["SimpleTransferController"]
+
     controller = get_transfer_controller(CopyMethod.SIMPLE, mock_config832)
     assert isinstance(controller, SimpleTransferController), (
-        "get_transfer_controller should return a SimpleTransferController "
-        "instance for SIMPLE transfer."
+        "Expected SimpleTransferController for SIMPLE transfer type."
     )
 
 
-def test_get_transfer_controller_invalid(mock_config832):
-    """
-    Test that get_transfer_controller raises ValueError for invalid transfer method.
-    """
+def test_get_transfer_controller_invalid(mock_config832, transfer_controller_module):
+    get_transfer_controller = transfer_controller_module["get_transfer_controller"]
     with pytest.raises(ValueError, match="Invalid transfer type"):
         get_transfer_controller("invalid_type", mock_config832)
 
@@ -91,11 +146,20 @@ def test_get_transfer_controller_invalid(mock_config832):
 # --------------------------------------------------------------------------
 # Tests for GlobusTransferController
 # --------------------------------------------------------------------------
-def test_globus_transfer_controller_copy_success(mock_config832, mock_globus_endpoint):
+
+def test_globus_transfer_controller_copy_success(
+    mock_config832, mock_globus_endpoint, mocker: MockFixture, transfer_controller_module
+):
     """
     Test a successful copy() operation using GlobusTransferController.
     We mock start_transfer to return True.
     """
+    GlobusTransferController = transfer_controller_module["GlobusTransferController"]
+    MockSecretClass = MockSecret
+
+    # Patch any Secret.load calls to avoid real Prefect Cloud calls
+    mocker.patch('prefect.blocks.system.Secret.load', return_value=MockSecretClass())
+
     with patch("orchestration.transfer_controller.start_transfer", return_value=True) as mock_start_transfer:
         controller = GlobusTransferController(mock_config832)
         result = controller.copy(
@@ -111,14 +175,21 @@ def test_globus_transfer_controller_copy_success(mock_config832, mock_globus_end
         _, called_kwargs = mock_start_transfer.call_args
         assert called_kwargs["source_endpoint"] == mock_globus_endpoint
         assert called_kwargs["dest_endpoint"] == mock_globus_endpoint
-        assert "max_wait_seconds" in called_kwargs, "max_wait_seconds should be passed to start_transfer."
+        assert "max_wait_seconds" in called_kwargs
 
 
-def test_globus_transfer_controller_copy_failure(mock_config832, mock_globus_endpoint):
+def test_globus_transfer_controller_copy_failure(
+    mock_config832, mock_globus_endpoint, mocker: MockFixture, transfer_controller_module
+):
     """
     Test a failing copy() operation using GlobusTransferController.
     We mock start_transfer to return False, indicating a transfer failure.
     """
+    GlobusTransferController = transfer_controller_module["GlobusTransferController"]
+    MockSecretClass = MockSecret
+
+    mocker.patch('prefect.blocks.system.Secret.load', return_value=MockSecretClass())
+
     with patch("orchestration.transfer_controller.start_transfer", return_value=False) as mock_start_transfer:
         controller = GlobusTransferController(mock_config832)
         result = controller.copy(
@@ -130,10 +201,13 @@ def test_globus_transfer_controller_copy_failure(mock_config832, mock_globus_end
         mock_start_transfer.assert_called_once()
 
 
-def test_globus_transfer_controller_copy_exception(mock_config832, mock_globus_endpoint):
+def test_globus_transfer_controller_copy_exception(
+    mock_config832, mock_globus_endpoint, transfer_controller_module
+):
     """
-    Test copy() operation that raises a TransferAPIError exception in GlobusTransferController.
+    Test copy() operation that raises a TransferAPIError exception.
     """
+    GlobusTransferController = transfer_controller_module["GlobusTransferController"]
     mock_response = MagicMock()
     mock_response.status_code = 400
     mock_response.reason = "Bad Request"
@@ -155,10 +229,11 @@ def test_globus_transfer_controller_copy_exception(mock_config832, mock_globus_e
 # --------------------------------------------------------------------------
 # Tests for SimpleTransferController
 # --------------------------------------------------------------------------
-def test_simple_transfer_controller_no_file_path(mock_config832, mock_file_system_endpoint):
-    """
-    Test that copy() returns False if no file_path is provided.
-    """
+
+def test_simple_transfer_controller_no_file_path(
+    mock_config832, mock_file_system_endpoint, transfer_controller_module
+):
+    SimpleTransferController = transfer_controller_module["SimpleTransferController"]
     controller = SimpleTransferController(mock_config832)
     result = controller.copy(
         file_path="",
@@ -168,10 +243,8 @@ def test_simple_transfer_controller_no_file_path(mock_config832, mock_file_syste
     assert result is False, "Expected False when no file_path is provided."
 
 
-def test_simple_transfer_controller_no_source_or_destination(mock_config832):
-    """
-    Test that copy() returns False if source or destination is None.
-    """
+def test_simple_transfer_controller_no_source_or_destination(mock_config832, transfer_controller_module):
+    SimpleTransferController = transfer_controller_module["SimpleTransferController"]
     controller = SimpleTransferController(mock_config832)
     result = controller.copy(
         file_path="test.txt",
@@ -181,11 +254,10 @@ def test_simple_transfer_controller_no_source_or_destination(mock_config832):
     assert result is False, "Expected False when either source or destination is None."
 
 
-def test_simple_transfer_controller_copy_success(mock_config832, mock_file_system_endpoint):
-    """
-    Test a successful copy() operation using SimpleTransferController by mocking os.system
-    to return 0 (indicating success).
-    """
+def test_simple_transfer_controller_copy_success(
+    mock_config832, mock_file_system_endpoint, transfer_controller_module
+):
+    SimpleTransferController = transfer_controller_module["SimpleTransferController"]
     with patch("os.system", return_value=0) as mock_os_system:
         controller = SimpleTransferController(mock_config832)
         result = controller.copy(
@@ -200,11 +272,10 @@ def test_simple_transfer_controller_copy_success(mock_config832, mock_file_syste
         assert "cp -r" in command_called, "Expected cp command in os.system call."
 
 
-def test_simple_transfer_controller_copy_failure(mock_config832, mock_file_system_endpoint):
-    """
-    Test a failing copy() operation using SimpleTransferController by mocking os.system
-    to return a non-zero code.
-    """
+def test_simple_transfer_controller_copy_failure(
+    mock_config832, mock_file_system_endpoint, transfer_controller_module
+):
+    SimpleTransferController = transfer_controller_module["SimpleTransferController"]
     with patch("os.system", return_value=1) as mock_os_system:
         controller = SimpleTransferController(mock_config832)
         result = controller.copy(
@@ -213,16 +284,16 @@ def test_simple_transfer_controller_copy_failure(mock_config832, mock_file_syste
             destination=mock_file_system_endpoint,
         )
 
-        assert result is False, "Expected False when os.system returns a non-zero code."
+        assert result is False, "Expected False when os.system returns non-zero."
         mock_os_system.assert_called_once()
         command_called = mock_os_system.call_args[0][0]
         assert "cp -r" in command_called, "Expected cp command in os.system call."
 
 
-def test_simple_transfer_controller_copy_exception(mock_config832, mock_file_system_endpoint):
-    """
-    Test a copy() operation that raises an exception in SimpleTransferController.
-    """
+def test_simple_transfer_controller_copy_exception(
+    mock_config832, mock_file_system_endpoint, transfer_controller_module
+):
+    SimpleTransferController = transfer_controller_module["SimpleTransferController"]
     with patch("os.system", side_effect=Exception("Mocked cp error")) as mock_os_system:
         controller = SimpleTransferController(mock_config832)
         result = controller.copy(

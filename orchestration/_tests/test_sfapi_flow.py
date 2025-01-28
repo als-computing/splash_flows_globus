@@ -1,9 +1,10 @@
 # orchestration/_tests/test_sfapi_flow.py
 
+from pathlib import Path
 import pytest
 from unittest.mock import MagicMock, patch, mock_open
-from pathlib import Path
 from uuid import uuid4
+
 from prefect.blocks.system import Secret
 from prefect.testing.utilities import prefect_test_harness
 
