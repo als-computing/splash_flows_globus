@@ -5,7 +5,7 @@ from enum import Enum
 import logging
 import os
 import time
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, TypeVar
 
 import globus_sdk
 
@@ -17,40 +17,65 @@ logger.setLevel(logging.INFO)
 load_dotenv()
 
 
-Endpoint = TypeVar("Endpoint", bound=GlobusEndpoint)
-
-
-class BaseEndpoint(Protocol):
+class TransferEndpoint(ABC):
     """
-    A protocol or abstract interface that all endpoints must implement or satisfy.
+    Abstract base class for endpoints.
     """
+    def __init__(
+        self,
+        name: str,
+        root_path: str
+    ) -> None:
+        self.name = name
+        self.root_path = root_path
 
-    @property
-    @abstractmethod
-    def root_path(self) -> str:
-        """
-        Root path or base directory for this endpoint.
-        """
-        ...
-
-    @property
-    @abstractmethod
     def name(self) -> str:
         """
         A human-readable or reference name for the endpoint.
         """
-        ...
+        return self.name
+
+    def root_path(self) -> str:
+        """
+        Root path or base directory for this endpoint.
+        """
+        return self.root_path
 
 
 @dataclass
-class FileSystemEndpoint(BaseEndpoint):
-    root_path: str
-    name: str = "local"
+class FileSystemEndpoint(TransferEndpoint):
+    """
+    A file system endpoint.
 
-    def full_path(self, path_suffix: str) -> str:
+    Args:
+        TransferEndpoint: Abstract class for endpoints.
+    """
+    def __init__(
+        self,
+        name: str,
+        root_path: str
+    ) -> None:
+        super().__init__(name, root_path)
+
+    def full_path(
+        self,
+        path_suffix: str
+    ) -> str:
+        """
+        Constructs the full path by appending the path_suffix to the root_path.
+
+        Args:
+            path_suffix (str): The relative path to append.
+
+        Returns:
+            str: The full absolute path.
+        """
         if path_suffix.startswith("/"):
             path_suffix = path_suffix[1:]
         return f"{self.root_path.rstrip('/')}/{path_suffix}"
+
+
+Endpoint = TypeVar("Endpoint", bound=TransferEndpoint)
 
 
 class TransferController(Generic[Endpoint], ABC):
@@ -73,15 +98,26 @@ class TransferController(Generic[Endpoint], ABC):
         source: Endpoint = None,
         destination: Endpoint = None,
     ) -> bool:
+        """
+        Copy a file from a source endpoint to a destination endpoint.
+
+        Args:
+            file_path (str): The path of the file to copy.
+            source (Endpoint): The source endpoint.
+            destination (Endpoint): The destination endpoint.
+
+        Returns:
+            bool: True if the transfer was successful, False otherwise.
+        """
         pass
 
 
-class GlobusTransfer(TransferController[GlobusEndpoint]):
+class GlobusTransferController(TransferController[GlobusEndpoint]):
     def __init__(
         self,
         config: Config832
     ) -> None:
-        self.config = config
+        super().__init__(config)
     """
     Use Globus Transfer to move data between endpoints.
 
@@ -140,12 +176,9 @@ class GlobusTransfer(TransferController[GlobusEndpoint]):
             return success
 
 
-class SimpleTransfer(TransferController[FileSystemEndpoint]):
-    def __init__(
-        self,
-        config: Config832
-    ) -> None:
-        self.config = config
+class SimpleTransferController(TransferController[FileSystemEndpoint]):
+    def __init__(self, config: Config832) -> None:
+        super().__init__(config)
     """
     Use a simple 'cp' command to move data within the same system.
 
@@ -156,25 +189,47 @@ class SimpleTransfer(TransferController[FileSystemEndpoint]):
     def copy(
         self,
         file_path: str = "",
-        source: FileSystemEndpoint = "",
-        destination: FileSystemEndpoint = "",
+        source: FileSystemEndpoint = None,
+        destination: FileSystemEndpoint = None,
     ) -> bool:
+        """
+        Copy a file from a source endpoint to a destination endpoint using the 'cp' command.
 
-        logger.info(f"Transferring {file_path} from {source} to {destination}")
+        Args:
+            file_path (str): The path of the file to copy.
+            source (FileSystemEndpoint): The source endpoint.
+            destination (FileSystemEndpoint): The destination endpoint.
 
-        if file_path[0] == "/":
+        Returns:
+            bool: True if the transfer was successful, False otherwise.
+        """
+        if not file_path:
+            logger.error("No file_path provided.")
+            return False
+        if not source or not destination:
+            logger.error("Source or destination endpoint not provided.")
+            return False
+
+        logger.info(f"Transferring {file_path} from {source.name} to {destination.name}")
+
+        if file_path.startswith("/"):
             file_path = file_path[1:]
 
-        source_path = os.path.join(source, file_path)
-        dest_path = os.path.join(destination, file_path)
+        source_path = os.path.join(source.root_path, file_path)
+        dest_path = os.path.join(destination.root_path, file_path)
         logger.info(f"Transferring {source_path} to {dest_path}")
+
         # Start the timer
         start_time = time.time()
 
         try:
-            os.system(f"cp -r {source_path} {dest_path}")
-            logger.info("Transfer completed successfully.")
-            return True
+            result = os.system(f"cp -r '{source_path}' '{dest_path}'")
+            if result == 0:
+                logger.info("Transfer completed successfully.")
+                return True
+            else:
+                logger.error(f"Transfer failed with exit code {result}.")
+                return False
         except Exception as e:
             logger.error(f"Transfer failed: {e}")
             return False
@@ -182,7 +237,6 @@ class SimpleTransfer(TransferController[FileSystemEndpoint]):
             # Stop the timer and calculate the duration
             elapsed_time = time.time() - start_time
             logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
-            return True
 
 
 class CopyMethod(Enum):
@@ -209,15 +263,31 @@ def get_transfer_controller(
         TransferController: The transfer controller object.
     """
     if transfer_type == CopyMethod.GLOBUS:
-        return GlobusTransfer(config)
+        return GlobusTransferController(config)
     elif transfer_type == CopyMethod.SIMPLE:
-        return SimpleTransfer(config)
+        return SimpleTransferController(config)
     else:
         raise ValueError(f"Invalid transfer type: {transfer_type}")
 
 
-def main():
+if __name__ == "__main__":
     config = Config832()
     transfer_type = CopyMethod.GLOBUS
-    controller = get_transfer_controller(transfer_type, config)
-    controller
+    globus_transfer_controller = get_transfer_controller(transfer_type, config)
+    globus_transfer_controller.copy(
+        file_path="dabramov/test.txt",
+        source=config.alcf832_raw,
+        destination=config.alcf832_scratch
+    )
+
+    simple_transfer_controller = get_transfer_controller(CopyMethod.SIMPLE, config)
+    success = simple_transfer_controller.copy(
+        file_path="test.rtf",
+        source=FileSystemEndpoint("source", "/Users/david/Documents/copy_test/test_source/"),
+        destination=FileSystemEndpoint("destination", "/Users/david/Documents/copy_test/test_destination/")
+    )
+
+    if success:
+        logger.info("Simple transfer succeeded.")
+    else:
+        logger.error("Simple transfer failed.")

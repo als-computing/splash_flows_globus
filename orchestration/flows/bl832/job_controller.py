@@ -22,7 +22,7 @@ class TomographyHPCController(ABC):
         self,
         config: Config832
     ) -> None:
-        pass
+        self.config = config
 
     @abstractmethod
     def reconstruct(

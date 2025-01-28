@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from dateutil import parser
+import json
 import logging
 import os
 from pathlib import Path
@@ -42,6 +43,13 @@ class GlobusEndpoint:
             path_suffix = path_suffix[1:]
         path = Path(self.root_path) / path_suffix
         return str(path)
+
+    def to_dict(self) -> dict:
+        return self.__dict__
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'GlobusEndpoint':
+        return cls(**data)
 
 
 @dataclass
@@ -301,3 +309,23 @@ def prune_one_safe(
 
     task_wait(tranfer_client, delete_id)
     logger.info(f"file deleted from: {source_endpoint.uri}")
+
+
+if __name__ == "__main__":
+    from orchestration.flows.bl832.config import Config832
+
+    # test globus endpoint serialization/deserialization
+    config = Config832()
+    # Example serialization
+    source = config.alcf832_raw
+    logger.info(source)
+
+    serialized = json.dumps(source.to_dict())
+    logger.info(serialized)
+
+    # Example deserialization
+    data = json.loads(serialized)
+    source_deserialized = GlobusEndpoint.from_dict(data)
+    logger.info(source_deserialized)
+
+    assert source == source_deserialized

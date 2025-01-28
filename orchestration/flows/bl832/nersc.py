@@ -35,8 +35,8 @@ class NERSCTomographyHPCController(TomographyHPCController):
         client: Client,
         config: Config832
     ) -> None:
+        super().__init__(config)
         self.client = client
-        self.config = config
 
     @staticmethod
     def create_sfapi_client() -> Client:
@@ -109,7 +109,7 @@ class NERSCTomographyHPCController(TomographyHPCController):
         # IMPORTANT: job script must be deindented to the leftmost column or it will fail immediately
         # Note: If q=debug, there is no minimum time limit
         # However, if q=preempt, there is a minimum time limit of 2 hours. Otherwise the job won't run.
-
+        # The realtime queue  can only be used for select accounts (e.g. ALS)
         job_script = f"""#!/bin/bash
 #SBATCH -q realtime
 #SBATCH -A als
