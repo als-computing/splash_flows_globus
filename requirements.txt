@@ -1,7 +1,7 @@
 globus-sdk>=3.0
 h5py
 httpx>=0.22.0
-numpy
+numpy==1.23.2
 pillow
 python-dotenv
 prefect==2.19.5

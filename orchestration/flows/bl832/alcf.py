@@ -3,6 +3,7 @@ import datetime
 import os
 from pathlib import Path
 import time
+# from typing import Optional
 
 from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.serialize import CombinedCode
@@ -12,8 +13,42 @@ from prefect import flow, task, get_run_logger
 from prefect.blocks.system import JSON, Secret
 
 from orchestration.flows.bl832.config import Config832
+from orchestration.flows.bl832.job_controller import TomographyHPCController
 from orchestration.globus.transfer import GlobusEndpoint, start_transfer
 from orchestration.prefect import schedule_prefect_flow
+
+
+class ALCFTomographyHPCController(TomographyHPCController):
+    """
+    Implementation of TomographyHPCController for ALCF.
+    Methods here leverage Globus Compute for processing tasks.
+
+    TODO: Refactor ALCF reconstruction flow into this class.
+
+    Args:
+        TomographyHPCController (ABC): Abstract class for tomography HPC controllers.
+    """
+
+    def __init__(self) -> None:
+        pass
+
+    def reconstruct(
+        self,
+        file_path: str = "",
+    ) -> bool:
+
+        # uses Globus Compute to reconstruct the tomography
+        # TODO: Refactor ALCF reconstruction code into this class.
+
+        pass
+
+    def build_multi_resolution(
+        self,
+        file_path: str = "",
+    ) -> bool:
+        # uses Globus Compute to build multi-resolution tomography
+        # TODO: Refactor ALCF multi-res zarr code into this class.
+        pass
 
 
 @task(name="transfer_data_to_alcf")
