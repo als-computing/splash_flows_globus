@@ -6,7 +6,7 @@ import time
 
 from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.serialize import CombinedCode
-from prefect import flow, task, get_run_logger
+from prefect import flow, task
 from prefect.blocks.system import JSON, Secret
 
 from orchestration.flows.bl832.config import Config832
@@ -42,13 +42,10 @@ class ALCFTomographyHPCController(TomographyHPCController):
         Run tomography reconstruction at ALCF through Globus Compute.
 
         Args:
-            rundir (str): the directory on the eagle file system (ALCF) where the input data are located
-            script_path (str): the path to the script that will run reconstruction
-            h5_file_name (str): the name of the h5 file to be reconstructed
-            folder_path (str): the path to the folder where the h5 file is located
+            file_path (str): Path to the file to be processed.
 
         Returns:
-            str: confirmation message regarding reconstruction and time to completion
+            bool: True if the task completed successfully, False otherwise.
         """
 
         file_name = Path(file_path).stem + ".h5"
@@ -78,6 +75,18 @@ class ALCFTomographyHPCController(TomographyHPCController):
         h5_file_name: str = None,
         folder_path: str = None
     ) -> str:
+        """
+        Python function that wraps around the application call for Tomopy reconstruction on ALCF
+
+        Args:
+            rundir (str): the directory on the eagle file system (ALCF) where the input data are located
+            script_path (str): the path to the script that will run the reconstruction
+            h5_file_name (str): the name of the h5 file to be reconstructed
+            folder_path (str): the path to the folder containing the h5 file
+
+        Returns:
+            str: confirmation message
+        """
         import os
         import subprocess
         import time
@@ -104,7 +113,6 @@ class ALCFTomographyHPCController(TomographyHPCController):
         self,
         file_path: str = "",
     ) -> bool:
-        # TODO: update this method to use only file_path
         """
         Tiff to Zarr code that is executed using Globus Compute
 
@@ -112,7 +120,7 @@ class ALCFTomographyHPCController(TomographyHPCController):
             file_path (str): Path to the file to be processed.
 
         Returns:
-            str: confirmation message regarding reconstruction and time to completion
+            bool: True if the task completed successfully, False otherwise.
         """
         file_name = Path(file_path).stem
         folder_name = Path(file_path).parent.name
@@ -245,6 +253,11 @@ def schedule_prune_task(
         path (str): The file path to the folder containing the files.
         location (str): The server location (e.g., 'alcf832_raw') where the files will be pruned.
         schedule_days (int): The number of days after which the file should be deleted.
+        source_endpoint (str): The source endpoint for the files.
+        check_endpoint (str): The endpoint to check for the existence of the files.
+
+    Returns:
+        bool: True if the task was scheduled successfully, False otherwise.
     """
     try:
         flow_name = f"delete {location}: {Path(path).name}"
@@ -275,7 +288,7 @@ def schedule_pruning(
     data832_scratch_path_tiff: str = None,
     data832_scratch_path_zarr: str = None,
     one_minute: bool = False,
-    config=None
+    config: Config832 = None
 ) -> bool:
     """
     This function schedules the deletion of files from specified locations on ALCF, NERSC, and data832.
@@ -288,9 +301,11 @@ def schedule_pruning(
         nersc_scratch_path_zarr (str, optional): The scratch path for Zarr files on NERSC.
         data832_scratch_path (str, optional): The scratch path on data832.
         one_minute (bool, optional): Defaults to False. Whether to schedule the deletion after one minute.
-    """
-    logger = get_run_logger()
+        config (Config832, optional): Configuration object for the flow.
 
+    Returns:
+        bool: True if the tasks were scheduled successfully, False otherwise.
+    """
     pruning_config = JSON.load("pruning-config").value
 
     if one_minute:
@@ -335,6 +350,9 @@ def alcf_recon_flow(
     Args:
         file_path (str): The path to the file to be processed.
         config (Config832): Configuration object for the flow.
+
+    Returns:
+        bool: True if the flow completed successfully, False otherwise.
     """
 
     # set up file paths
