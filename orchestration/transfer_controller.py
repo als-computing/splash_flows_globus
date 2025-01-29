@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from dotenv import load_dotenv
 from enum import Enum
 import logging
@@ -42,7 +41,6 @@ class TransferEndpoint(ABC):
         return self.root_path
 
 
-@dataclass
 class FileSystemEndpoint(TransferEndpoint):
     """
     A file system endpoint.
