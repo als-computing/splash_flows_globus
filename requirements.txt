@@ -1,6 +1,9 @@
 globus-sdk>=3.0
 h5py
 httpx>=0.22.0
+mkdocs
+mkdocs-material
+mkdocs-mermaid2-plugin
 numpy==1.23.2
 pillow
 python-dotenv

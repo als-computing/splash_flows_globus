@@ -1,0 +1,38 @@
+# Project Information
+site_name: Splash Flows Globus Documentation
+site_description: Splash Flows Globus Documentation
+site_author: ALS Computing
+site_dir: public
+# site_url: "https://docs.nersc.gov/"
+repo_name: splash_flows_globus
+repo_url: https://github.com/als-computing/splash_flows_globus
+edit_uri: blob/main/docs/
+
+# Navigation
+nav:
+- Home: index.md
+- Installation and Requirements: install.md
+- Getting Started: getting_started.md
+- Compute at ALCF: alcf832.md
+- Compute at NERSC: nersc832.md
+- Orchestration: orchestration.md
+- Configuration: configuration.md
+# - Troubleshooting: troubleshooting.md
+- Glossary: glossary.md
+- About: about.md
+
+# Theme and Plugins
+theme:
+  name: material
+  custom_dir: overrides
+extra_css:
+- assets/als_style.css
+extra:
+  favicon: overrides/assets/images/favicon.png
+  social:
+  - icon: fontawesome/brands/github
+    link: https://github.com/als-computing
+
+plugins:
+- mermaid2
+- search
