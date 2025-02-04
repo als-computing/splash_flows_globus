@@ -3,7 +3,7 @@ site_name: Splash Flows Globus Documentation
 site_description: Splash Flows Globus Documentation
 site_author: ALS Computing
 site_dir: public
-# site_url: "https://docs.nersc.gov/"
+site_url: "https://davramov.github.io/splash_flows_globus/"
 repo_name: splash_flows_globus
 repo_url: https://github.com/als-computing/splash_flows_globus
 edit_uri: blob/main/docs/
