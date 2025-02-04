@@ -82,7 +82,9 @@ def get_controller(
 
     if hpc_type == HPC.ALCF:
         from orchestration.flows.bl832.alcf import ALCFTomographyHPCController
-        return ALCFTomographyHPCController()
+        return ALCFTomographyHPCController(
+            config=config
+        )
     elif hpc_type == HPC.NERSC:
         from orchestration.flows.bl832.nersc import NERSCTomographyHPCController
         return NERSCTomographyHPCController(
