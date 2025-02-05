@@ -33,4 +33,6 @@ jobs:
     - name: Test with pytest
       run: |
         pytest
- 
+    - name: Build MkDocs site
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: mkdocs gh-deploy -f docs/mkdocs/mkdocs.yml
