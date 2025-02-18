@@ -1,4 +1,8 @@
+authlib
+dynaconf
+globus-compute-sdk @ git+https://github.com/globus/globus-compute.git@d1731340074be56861ec91d732bdff44f8e2b46e#subdirectory=compute_sdk
 globus-sdk>=3.0
+griffe==0.47
 h5py
 httpx>=0.22.0
 mkdocs
@@ -8,10 +12,7 @@ numpy==1.23.2
 pillow
 python-dotenv
 prefect==2.19.5
+prometheus_client==0.21.1
 pyscicat
 pyyaml
-authlib
 sfapi_client
-globus-compute-sdk @ git+https://github.com/globus/globus-compute.git@d1731340074be56861ec91d732bdff44f8e2b46e#subdirectory=compute_sdk
-griffe==0.47
-prometheus_client==0.21.1
