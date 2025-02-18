@@ -15,17 +15,17 @@ globus:
       uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
       name: nersc7011_alsdev_raw
 
-    data7011:
+    qnap7011:
       root_path: /
-      uri: data7011.lbl.gov
+      uri: qnap7011.lbl.gov
       uuid: tbd
-      name: data7011
+      name: qnap7011
 
-    data7011_raw:
+    qnap7011_raw:
       root_path: /data/raw
-      uri: data7011.lbl.gov
+      uri: qnap7011.lbl.gov
       uuid: tbd
-      name: data7011_raw
+      name: qnap7011_raw
 
     # 7.0.1.2 ENDPOINTS
 
