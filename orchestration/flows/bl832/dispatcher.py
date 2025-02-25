@@ -1,9 +1,12 @@
 import asyncio
+from pathlib import Path
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import JSON
 from prefect.deployments.deployments import run_deployment
 from pydantic import BaseModel, ValidationError, Field
 from typing import Any, Optional, Union
+
+from orchestration.hpss import TapeArchiveQueue
 
 
 class FlowParameterMapper:
@@ -125,15 +128,30 @@ async def dispatcher(
         decision_settings = await JSON.load("decision-settings")
         if decision_settings.value.get("new_832_file_flow/new_file_832"):
             logger.info("Running new_file_832 flow...")
-            await run_specific_flow("new_832_file_flow/new_file_832",
-                                    FlowParameterMapper.get_flow_parameters(
-                                        "new_832_file_flow/new_file_832",
-                                        available_params))
+            await run_specific_flow(
+                "new_832_file_flow/new_file_832",
+                FlowParameterMapper.get_flow_parameters(
+                    "new_832_file_flow/new_file_832",
+                    available_params
+                )
+            )
             logger.info("Completed new_file_832 flow.")
     except Exception as e:
         logger.error(f"new_832_file_flow/new_file_832 flow failed: {e}")
         # Optionally, raise a specific ValueError
         raise ValueError("new_file_832 flow Failed") from e
+
+    # TODO: Track the project name in a list of what needs to move
+        # to HPSS from NERSC CFS, for a scheduled run every 6 months.
+        # Maybe in a Prefect JSON Block?
+    try:
+        # Add project to tape archive queue, if file_path is provided
+        project_path = str(Path(file_path).parent)
+        archive_queue = TapeArchiveQueue("TAPE_ARCHIVE_QUEUE")
+        archive_queue.enqueue_project(project_path)
+        logger.info(f"Project '{project_path}' added to tape archive queue.")
+    except Exception as e:
+        logger.error(f"Failed to add project to tape archive queue: {e}")
 
     # Prepare ALCF and NERSC flows to run asynchronously, based on settings
     tasks = []
@@ -156,6 +174,40 @@ async def dispatcher(
         logger.info("No ALCF or NERSC tasks to run based on decision settings.")
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# Tape Transfer Flow: Process pending projects
+# ---------------------------------------------------------------------------
+# Runs every 6 months to process tape transfers for pending projects.
+# ---------------------------------------------------------------------------
+@flow(name="tape_transfer_dispatcher")
+async def tape_transfer_dispatcher(config) -> None:
+    """
+    Scheduled flow to process tape transfers.
+    It should call the CFStoHPSSTransferController (not shown) and, upon success, mark projects as moved.
+    """
+    logger = get_run_logger()
+    try:
+        block = TapeArchiveQueue.load("TAPE_ARCHIVE_QUEUE_BLOCK")
+    except Exception:
+        logger.info("No project status block found.")
+        return
+
+    for project in block.pending_projects.copy():
+        logger.info(f"Transferring project '{project}' to tape...")
+
+        # Run the CFS to HPSS transfer flow for the project
+        # params = {
+        #     "file_path": project,
+        #     "source": nersc_cfs,
+        #     "destination": hpss,
+        #     "config": Config832()
+        # }
+        # run_specific_flow("cfs_to_hpss_flow/cfs_to_hpss_flow", {"file_path": project})
+
+        TapeArchiveQueue.mark_project_as_moved(project)
+        logger.info(f"Project '{project}' marked as moved.")
 
 
 if __name__ == "__main__":
