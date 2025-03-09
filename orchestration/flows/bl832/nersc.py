@@ -16,6 +16,7 @@ from sfapi_client.compute import Machine
 from orchestration.flows.bl832.config import Config832
 from orchestration.flows.bl832.job_controller import get_controller, HPC, TomographyHPCController
 from orchestration.transfer_controller import get_transfer_controller, CopyMethod
+from orchestration.flows.bl832.streaming_mixin import NerscStreamingMixin, monitor_streaming_job
 from orchestration.prefect import schedule_prefect_flow
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ logger.setLevel(logging.INFO)
 load_dotenv()
 
 
-class NERSCTomographyHPCController(TomographyHPCController):
+class NERSCTomographyHPCController(TomographyHPCController, NerscStreamingMixin):
     """
     Implementation for a NERSC-based tomography HPC controller.
 
@@ -35,7 +36,7 @@ class NERSCTomographyHPCController(TomographyHPCController):
         client: Client,
         config: Config832
     ) -> None:
-        super().__init__(config)
+        TomographyHPCController.__init__(self, config)
         self.client = client
 
     @staticmethod
@@ -283,6 +284,14 @@ date
                     return False
             else:
                 return False
+            
+    def start_streaming_service(
+        self,
+        walltime: datetime.timedelta = datetime.timedelta(minutes=30),
+    ) -> str:
+        return NerscStreamingMixin.start_streaming_service(self, 
+                                                           client=self.client, 
+                                                           walltime=walltime)
 
 
 def schedule_pruning(
@@ -487,9 +496,40 @@ def nersc_recon_flow(
     else:
         return False
 
+@flow(name="nersc_streaming_flow")
+def nersc_streaming_flow(
+    config: Config832,
+    walltime: datetime.timedelta = datetime.timedelta(minutes=5),
+    monitor_interval: int = 10,
+) -> bool:
+    logger.info(f"Starting NERSC streaming flow with {walltime} walltime")
+    
+    controller: NERSCTomographyHPCController = get_controller(
+        hpc_type=HPC.NERSC,
+        config=config
+    ) # type: ignore
+    
+    job_id = controller.start_streaming_service(walltime=walltime)
+    
+    success = monitor_streaming_job.submit(
+        client=controller.client, 
+        job_id=job_id, 
+        update_interval=monitor_interval
+    )
+    
+    logger.info(f"Monitoring streaming job started with ID: {job_id}")
+    
+    return success.result()
+
 
 if __name__ == "__main__":
+    
+    config = Config832()
     nersc_recon_flow(
         file_path="dabramov/20230606_151124_jong-seto_fungal-mycelia_roll-AQ_fungi1_fast.h5",
-        config=Config832()
+        config=config
     )
+    # nersc_streaming_flow(
+    #     config=config,
+    #     walltime=datetime.timedelta(minutes=5)
+    # )
