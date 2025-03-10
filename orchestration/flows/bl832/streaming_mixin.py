@@ -3,7 +3,11 @@ import json
 import pathlib
 import time
 
-from prefect import flow, task, get_run_logger
+from prefect import Flow, flow, get_run_logger
+from prefect.logging.loggers import flow_run_logger
+from prefect.client.schemas.objects import FlowRun, State
+from prefect.blocks.system import JSON
+from prefect.runtime import flow_run
 from sfapi_client import Client as SFAPI_Client
 from sfapi_client.compute import Machine
 from sfapi_client.jobs import JobState, TERMINAL_STATES
@@ -63,11 +67,11 @@ class NerscStreamingSettings(BaseSettings):
 cfg = NerscStreamingSettings()
 
 
-@task(name="monitor_streaming_job")
 def monitor_streaming_job(
     client: SFAPI_Client, job_id: str, update_interval: int
 ) -> bool:
     logger = get_run_logger()
+    logger.info(f"Monitoring streaming job {job_id}...")
     perlmutter = client.compute(Machine.perlmutter)
     retries = 0
     max_retries = 3
@@ -163,11 +167,42 @@ podman-hpc run --rm \
             return job.jobid
 
         except Exception as e:
-            logger.error(f"Failed to submit streaming job: {e}")
+            logger.exception(f"Failed to submit streaming job: {e}")
             raise
 
 
-@flow(name="nersc_streaming_flow")
+def cancellation_hook(flow: Flow, flow_run: FlowRun, state: State):
+    logger = flow_run_logger(flow_run, flow)
+    block_name = f"{flow_run.id}-metadata"
+    try:
+        meta = JSON.load(name=block_name)
+    except ValueError:
+        logger.exception("No metadata found for this flow run")
+        return
+    job_id = meta.value.get("job_id")
+    if not job_id:
+        logger.info("No job ID found in metadata")
+        return
+
+    logger.info(f"Attempting to cancel NERSC job {job_id}")
+    try:
+        cfg.create_sfapi_client().compute(Machine.perlmutter).job(jobid=job_id).cancel()
+    except (Exception, SfApiError) as e:
+        logger.error(f"Failed to cancel job: {e}")
+
+    logger.info(f"Successfully requested cancellation for job {job_id}")
+
+    # cleanup block
+    meta.delete(name=block_name)
+
+
+def save_block(job_id: str) -> JSON:
+    block = JSON(value={"job_id": job_id})
+    block.save(name=f"{flow_run.get_id()}-metadata")
+    return block
+
+
+@flow(name="nersc_streaming_flow", on_cancellation=[cancellation_hook], log_prints=True)
 def nersc_streaming_flow(
     client: SFAPI_Client | None = None,
     walltime: datetime.timedelta = datetime.timedelta(minutes=5),
@@ -185,13 +220,16 @@ def nersc_streaming_flow(
         client=client, walltime=walltime
     )
 
-    success = monitor_streaming_job.submit(
-        client=client, job_id=job_id, update_interval=monitor_interval
+    logger.info("Saving job ID to metadata block...")
+    save_block(job_id)
+
+    success = monitor_streaming_job(
+        client=client,
+        job_id=job_id,
+        update_interval=monitor_interval,
     )
 
-    logger.info(f"Monitoring job started with ID: {job_id}")
-
-    return success.result()
+    return success
 
 
 if __name__ == "__main__":
