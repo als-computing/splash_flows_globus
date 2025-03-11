@@ -1,4 +1,6 @@
 import { UseMutationResult } from '@tanstack/react-query'
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 
 type FlowControlsProps = {
   flowId: string | null
@@ -16,26 +18,31 @@ export function FlowControls({
   handleCancelFlow
 }: FlowControlsProps) {
   return (
-    <>
-      <button 
+    <div className="space-y-4">
+      <Button 
         onClick={handleLaunchFlow}
         disabled={launchFlowMutation.isPending}
+        variant="default"
+        className="w-full"
       >
         {launchFlowMutation.isPending ? 'Launching...' : 'Launch Streaming Flow'}
-      </button>
+      </Button>
       
       {flowId && (
-        <>
-          <p>Flow ID: {flowId}</p>
-          <button
-            onClick={handleCancelFlow}
-            disabled={cancelFlowMutation.isPending || !!cancelFlowMutation.data?.message}
-            style={{ marginTop: '10px', backgroundColor: cancelFlowMutation.data?.message ? '#555' : '#aa3333' }}
-          >
-            {cancelFlowMutation.isPending ? 'Cancelling...' : cancelFlowMutation.data?.message ? 'Cancelled' : 'Cancel Flow'}
-          </button>
-        </>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground mb-2">Flow ID: {flowId}</p>
+            <Button
+              onClick={handleCancelFlow}
+              disabled={cancelFlowMutation.isPending || !!cancelFlowMutation.data?.message}
+              variant={cancelFlowMutation.data?.message ? "outline" : "destructive"}
+              className="w-full"
+            >
+              {cancelFlowMutation.isPending ? 'Cancelling...' : cancelFlowMutation.data?.message ? 'Cancelled' : 'Cancel Flow'}
+            </Button>
+          </CardContent>
+        </Card>
       )}
-    </>
+    </div>
   )
 }

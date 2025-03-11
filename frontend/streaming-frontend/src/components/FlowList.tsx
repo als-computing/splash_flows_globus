@@ -1,4 +1,7 @@
 import { FlowRunInfo } from '../types/flowTypes'
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Loader2 } from "lucide-react"
 
 type FlowListProps = {
   flowRunInfos: FlowRunInfo[]
@@ -8,31 +11,46 @@ type FlowListProps = {
 
 export function FlowList({ flowRunInfos, isFetchingFlows, refetchFlowRuns }: FlowListProps) {
   return (
-    <>
-      <button 
+    <div className="space-y-4">
+      <Button 
         onClick={() => refetchFlowRuns()}
         disabled={isFetchingFlows}
-        style={{ backgroundColor: '#2a6495' }}
+        variant="secondary"
+        className="w-full"
       >
-        {isFetchingFlows ? 'Fetching...' : 'Refresh Running Flow Runs'}
-      </button>
+        {isFetchingFlows ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Fetching...
+          </>
+        ) : 'Refresh Running Flow Runs'}
+      </Button>
       
       {flowRunInfos.length > 0 && (
-        <div style={{ marginTop: '10px', textAlign: 'left' }}>
-          <h3>Flow Run IDs:</h3>
-          <ul>
-            {flowRunInfos.map((info, index) => (
-              <li key={index}>
-                {info.id} - State: {info.state || 'Unknown'}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Flow Run IDs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {flowRunInfos.map((info, index) => (
+                <li key={index} className="flex items-center border-b border-border pb-2 last:border-0 last:pb-0">
+                  <div className="flex-1">
+                    <span className="font-mono text-sm">{info.id}</span>
+                    <p className="text-sm text-muted-foreground">
+                      State: <span className="font-medium">{info.state || 'Unknown'}</span>
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       )}
       
       {flowRunInfos.length === 0 && !isFetchingFlows && (
-        <p>No flow runs found.</p>
+        <p className="text-center text-muted-foreground">No flow runs found.</p>
       )}
-    </>
+    </div>
   )
 }
