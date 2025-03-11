@@ -1,97 +1,114 @@
 import { useState } from 'react'
 import './App.css'
 import axios from 'axios'
+import { QueryClient, QueryClientProvider, useMutation, useQuery } from '@tanstack/react-query'
 
+// Create a client
+const queryClient = new QueryClient()
 
-enum StateType { SCHEDULED, PENDING, RUNNING, COMPLETED, FAILED, CANCELLED, CRASH }
+// Convert to string enum
+enum StateType {
+  SCHEDULED = "SCHEDULED",
+  PENDING = "PENDING",
+  RUNNING = "RUNNING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+  CANCELLED = "CANCELLED",
+  CRASH = "CRASH"
+}
+
 type FlowRunInfo = {
   id: string
   state: StateType | null
 }
 
+// Wrap the app with QueryClientProvider
+function AppWithProvider() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  )
+}
+
 function App() {
   const [flowId, setFlowId] = useState<string | null>(null)
-  const [isLaunching, setIsLaunching] = useState(false)
-  const [isCancelling, setIsCancelling] = useState(false)
-  const [isFetchingFlows, setIsFetchingFlows] = useState(false)
-  const [flowRunInfos, setFlowRunInfos] = useState<FlowRunInfo[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [cancelMessage, setCancelMessage] = useState<string | null>(null)
 
-  const handleLaunchFlow = async () => {
-    setIsLaunching(true)
-    setError(null)
-    setCancelMessage(null)
-    
-    try {
+  // Fetch running flows with useQuery
+  const {
+    data: flowRunInfos = [],
+    isLoading: isFetchingFlows,
+    refetch: refetchFlowRuns,
+  } = useQuery({
+    queryKey: ['flowRuns'],
+    queryFn: async () => {
+      const response = await axios.get('http://localhost:8000/flows/running')
+      return response.data.flow_run_infos as FlowRunInfo[]
+    },
+    refetchInterval: 5000, // Auto-refresh every 5 seconds
+  })
+
+  // Launch flow mutation
+  const launchFlowMutation = useMutation({
+    mutationFn: async () => {
       const response = await axios.post('http://localhost:8000/flows/launch', {
         walltime_minutes: 5
       })
-      setFlowId(response.data.flow_run_id)
-    } catch (err) {
-      // Improved error handling
+      return response.data
+    },
+    onSuccess: (data) => {
+      setFlowId(data.flow_run_id)
+      // Refetch flow runs after launching a new one
+      queryClient.invalidateQueries({ queryKey: ['flowRuns'] })
+    },
+    onError: (err) => {
       if (axios.isAxiosError(err)) {
         const errorMessage = err.response?.data?.detail || 
-                            (typeof err.message === 'string' ? err.message : 'Failed to launch flow');
-        setError(errorMessage);
+                          (typeof err.message === 'string' ? err.message : 'Failed to launch flow')
+        setError(errorMessage)
       } else if (err instanceof Error) {
-        setError(err.message);
+        setError(err.message)
       } else {
-        setError('Unexpected error occurred');
+        setError('Unexpected error occurred')
       }
       console.error('Error launching flow:', err)
-    } finally {
-      setIsLaunching(false)
-    }
-  }
+    },
+  })
 
-  const handleCancelFlow = async () => {
-    if (!flowId) return;
-    
-    setIsCancelling(true)
-    setError(null)
-    setCancelMessage(null)
-    
-    try {
+  // Cancel flow mutation
+  const cancelFlowMutation = useMutation({
+    mutationFn: async (flowId: string) => {
       const response = await axios.delete(`http://localhost:8000/flows/${flowId}`)
-      setCancelMessage(response.data.message)
-    } catch (err) {
+      return response.data
+    },
+    onSuccess: () => {
+      // Refetch flow runs after cancelling
+      queryClient.invalidateQueries({ queryKey: ['flowRuns'] })
+    },
+    onError: (err) => {
       if (axios.isAxiosError(err)) {
         const errorMessage = err.response?.data?.detail || 
-                            (typeof err.message === 'string' ? err.message : 'Failed to cancel flow');
-        setError(errorMessage);
+                          (typeof err.message === 'string' ? err.message : 'Failed to cancel flow')
+        setError(errorMessage)
       } else if (err instanceof Error) {
-        setError(err.message);
+        setError(err.message)
       } else {
-        setError('Unexpected error occurred while cancelling flow');
+        setError('Unexpected error occurred while cancelling flow')
       }
       console.error('Error cancelling flow:', err)
-    } finally {
-      setIsCancelling(false)
-    }
+    },
+  })
+
+  const handleLaunchFlow = () => {
+    setError(null)
+    launchFlowMutation.mutate()
   }
 
-  const handleFetchFlowRuns = async () => {
-    setIsFetchingFlows(true)
+  const handleCancelFlow = () => {
+    if (!flowId) return
     setError(null)
-    
-    try {
-      const response = await axios.get('http://localhost:8000/flows/running')
-      setFlowRunInfos(response.data.flow_run_infos)
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const errorMessage = err.response?.data?.detail || 
-                            (typeof err.message === 'string' ? err.message : 'Failed to fetch flow runs');
-        setError(errorMessage);
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Unexpected error occurred while fetching flow runs');
-      }
-      console.error('Error fetching flow runs:', err)
-    } finally {
-      setIsFetchingFlows(false)
-    }
+    cancelFlowMutation.mutate(flowId)
   }
 
   return (
@@ -100,9 +117,9 @@ function App() {
       <div className="card">
         <button 
           onClick={handleLaunchFlow}
-          disabled={isLaunching}
+          disabled={launchFlowMutation.isPending}
         >
-          {isLaunching ? 'Launching...' : 'Launch Streaming Flow'}
+          {launchFlowMutation.isPending ? 'Launching...' : 'Launch Streaming Flow'}
         </button>
         
         {flowId && (
@@ -110,21 +127,21 @@ function App() {
             <p>Flow ID: {flowId}</p>
             <button
               onClick={handleCancelFlow}
-              disabled={isCancelling || cancelMessage !== null}
-              style={{ marginTop: '10px', backgroundColor: cancelMessage ? '#555' : '#aa3333' }}
+              disabled={cancelFlowMutation.isPending || !!cancelFlowMutation.data?.message}
+              style={{ marginTop: '10px', backgroundColor: cancelFlowMutation.data?.message ? '#555' : '#aa3333' }}
             >
-              {isCancelling ? 'Cancelling...' : cancelMessage ? 'Cancelled' : 'Cancel Flow'}
+              {cancelFlowMutation.isPending ? 'Cancelling...' : cancelFlowMutation.data?.message ? 'Cancelled' : 'Cancel Flow'}
             </button>
           </>
         )}
         
         <div style={{ marginTop: '20px', borderTop: '1px solid #444', paddingTop: '20px' }}>
           <button 
-            onClick={handleFetchFlowRuns}
+            onClick={() => refetchFlowRuns()}
             disabled={isFetchingFlows}
             style={{ backgroundColor: '#2a6495' }}
           >
-            {isFetchingFlows ? 'Fetching...' : 'Fetch Running Flow Runs'}
+            {isFetchingFlows ? 'Fetching...' : 'Refresh Running Flow Runs'}
           </button>
           
           {flowRunInfos.length > 0 && (
@@ -133,14 +150,14 @@ function App() {
               <ul>
                 {flowRunInfos.map((info, index) => (
                   <li key={index}>
-                    {info.id} - State: {info.state ? info.state : 'Unknown'}
+                    {info.id} - State: {info.state || 'Unknown'}
                   </li>
                 ))}
               </ul>
             </div>
           )}
           
-          {flowRunInfos.length === 0 && !isFetchingFlows && flowRunInfos.length !== undefined && (
+          {flowRunInfos.length === 0 && !isFetchingFlows && (
             <p>No flow runs found.</p>
           )}
         </div>
@@ -149,12 +166,12 @@ function App() {
           <p style={{ color: 'red' }}>{error}</p>
         )}
         
-        {cancelMessage && (
-          <p style={{ color: 'green' }}>{cancelMessage}</p>
+        {cancelFlowMutation.data?.message && (
+          <p style={{ color: 'green' }}>{cancelFlowMutation.data.message}</p>
         )}
       </div>
     </>
   )
 }
 
-export default App
+export default AppWithProvider
