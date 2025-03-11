@@ -204,17 +204,16 @@ def save_block(job_id: str) -> JSON:
 
 @flow(name="nersc_streaming_flow", on_cancellation=[cancellation_hook], log_prints=True)
 def nersc_streaming_flow(
-    client: SFAPI_Client | None = None,
     walltime: datetime.timedelta = datetime.timedelta(minutes=5),
     monitor_interval: int = 10,
 ) -> bool:
     logger = get_run_logger()
     logger.info(f"Starting NERSC streaming flow with {walltime} walltime")
 
-    # Create a client if none was provided
-    if client is None:
-        logger.info("No client provided, creating one...")
+    try:
         client = cfg.create_sfapi_client()
+    except RuntimeError as e:
+        logger.error(f"Failed to create NERSC client: {e}")
 
     job_id = NerscStreamingMixin().start_streaming_service(
         client=client, walltime=walltime
@@ -233,5 +232,4 @@ def nersc_streaming_flow(
 
 
 if __name__ == "__main__":
-    client = cfg.create_sfapi_client()
-    nersc_streaming_flow(client=client)
+    nersc_streaming_flow()

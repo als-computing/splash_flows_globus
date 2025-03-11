@@ -8,7 +8,7 @@ import re
 import time
 
 from authlib.jose import JsonWebKey
-from prefect import flow
+from prefect import flow, get_run_logger
 from prefect.blocks.system import JSON
 from sfapi_client import Client
 from sfapi_client.compute import Machine
@@ -16,7 +16,7 @@ from sfapi_client.compute import Machine
 from orchestration.flows.bl832.config import Config832
 from orchestration.flows.bl832.job_controller import get_controller, HPC, TomographyHPCController
 from orchestration.transfer_controller import get_transfer_controller, CopyMethod
-from orchestration.flows.bl832.streaming_mixin import NerscStreamingMixin, monitor_streaming_job
+from orchestration.flows.bl832.streaming_mixin import NerscStreamingMixin, cancellation_hook, monitor_streaming_job, save_block
 from orchestration.prefect import schedule_prefect_flow
 
 logger = logging.getLogger(__name__)
@@ -496,12 +496,13 @@ def nersc_recon_flow(
     else:
         return False
 
-@flow(name="nersc_streaming_flow")
+@flow(name="nersc_streaming_flow", on_cancellation=[cancellation_hook])
 def nersc_streaming_flow(
     config: Config832,
     walltime: datetime.timedelta = datetime.timedelta(minutes=5),
     monitor_interval: int = 10,
 ) -> bool:
+    logger = get_run_logger()
     logger.info(f"Starting NERSC streaming flow with {walltime} walltime")
     
     controller: NERSCTomographyHPCController = get_controller(
@@ -510,16 +511,15 @@ def nersc_streaming_flow(
     ) # type: ignore
     
     job_id = controller.start_streaming_service(walltime=walltime)
+    save_block(job_id)
     
-    success = monitor_streaming_job.submit(
+    success = monitor_streaming_job(
         client=controller.client, 
         job_id=job_id, 
         update_interval=monitor_interval
     )
-    
-    logger.info(f"Monitoring streaming job started with ID: {job_id}")
-    
-    return success.result()
+        
+    return success
 
 
 if __name__ == "__main__":
