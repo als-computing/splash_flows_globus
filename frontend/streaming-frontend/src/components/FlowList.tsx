@@ -1,7 +1,7 @@
 import { FlowRunInfo } from '../types/flowTypes'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
+import { UseMutationResult } from '@tanstack/react-query'
 
 type FlowListProps = {
   flowRunInfos: FlowRunInfo[]
@@ -12,24 +12,11 @@ type FlowListProps = {
 export function FlowList({ flowRunInfos, isFetchingFlows, refetchFlowRuns }: FlowListProps) {
   return (
     <div className="space-y-4">
-      <Button 
-        onClick={() => refetchFlowRuns()}
-        disabled={isFetchingFlows}
-        variant="secondary"
-        className="w-full"
-      >
-        {isFetchingFlows ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Fetching...
-          </>
-        ) : 'Refresh Running Flow Runs'}
-      </Button>
       
       {flowRunInfos.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">Flow Run IDs</CardTitle>
+            <CardTitle className="text-xl">Streaming Sessions</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">

@@ -3,7 +3,7 @@ import { useFlowAPI } from '../hooks/useFlowAPI'
 import { FlowList } from './FlowList'
 import { LuanchFlowButton } from './LaunchFlowButton'
 import axios from 'axios'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons"
 
@@ -47,7 +47,7 @@ export function FlowDashboard() {
       onError: (err) => {
         if (axios.isAxiosError(err)) {
           const errorMessage = err.response?.data?.detail || 
-                          (typeof err.message === 'string' ? err.message : 'Failed to cancel flow')
+                          (typeof err.message === 'string' ? err.message : 'Failed to cancel session')
           setError(errorMessage)
         } else if (err instanceof Error) {
           setError(err.message)
@@ -61,11 +61,8 @@ export function FlowDashboard() {
 
   return (
     <div className="container mx-auto py-8 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6 text-center">Streaming Flow Launcher</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">Streaming Sessions</h1>
       <Card>
-        <CardHeader>
-          <CardTitle>Flow Controls</CardTitle>
-        </CardHeader>
         <CardContent className="space-y-6">
           <LuanchFlowButton 
             flowId={flowId}
