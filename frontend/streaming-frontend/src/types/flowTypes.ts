@@ -1,11 +1,13 @@
-export enum StateType {
+export enum PrefectState {
   SCHEDULED = "SCHEDULED",
   PENDING = "PENDING",
   RUNNING = "RUNNING",
   COMPLETED = "COMPLETED",
   FAILED = "FAILED",
   CANCELLED = "CANCELLED",
-  CRASH = "CRASH",
+  CRASHED = "CRASHED",
+  PAUSED = "PAUSED",
+  CANCELLING = "CANCELLING",
 }
 
 export enum SlurmJobState { 
@@ -42,7 +44,8 @@ export type SlurmJobInfo = {
 }
 
 export type FlowRunInfo = {
+  name: string
   id: string
-  state: StateType | null
+  state: PrefectState | null
   slurm_job_info: SlurmJobInfo | null
 }

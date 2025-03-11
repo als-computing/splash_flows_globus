@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useFlowAPI } from "@/hooks/useFlowAPI"
 import axios from "axios"
 import { useState } from "react"
-import { StateType } from "../types/flowTypes"
+import { PrefectState } from "../types/flowTypes"
 import { ErrorAlert } from "./ErrorAlert"
+import { StatusBadge } from "./StatusBadge"
 
 export function FlowList() {
   const [error, setError] = useState<string | null>(null)
@@ -39,12 +40,12 @@ export function FlowList() {
       {flowRunInfos.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">Streaming Sessions</CardTitle>
+            <CardTitle className="text-xl">Running Streaming Sessions</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
               {flowRunInfos.map((info, index) => {
-                const isRunning = info.state === StateType.RUNNING
+                const isRunning = info.state === PrefectState.RUNNING
                 const isCancelling =
                   cancelFlowMutation?.isPending &&
                   cancelFlowMutation.variables === info.id
@@ -59,24 +60,24 @@ export function FlowList() {
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex flex-col">
-                        <span className="font-mono text-sm">{info.id}</span>
-                        {info.slurm_job_info?.job_id && (
-                          <>
-                            <span className="font-mono text-xs text-muted-foreground">
-                              Slurm Job ID: {info.slurm_job_info.job_id}
-                            </span>
-                            <span className="font-mono text-xs text-muted-foreground">
-                              Slurm Job Status: {info.slurm_job_info.job_state}
-                            </span>
-                          </>
-                        )}
+                        <span className="font-mono text-sm">{info.name}</span>
                       </div>
-                      <span
-                        className={`text-sm font-medium ${isRunning ? "text-green-600" : "text-muted-foreground"}`}
-                      >
-                        {info.state || "Unknown"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {info.slurm_job_info?.job_id && (
+                          <StatusBadge 
+                            status={info.slurm_job_info.job_state} 
+                            type="slurm"
+                            jobId={info.slurm_job_info.job_id}
+                          />
+                        )}
+                        <StatusBadge 
+                          status={info.state} 
+                          type="prefect"
+                          flowId={info.id}
+                        />
+                      </div>
                     </div>
+                    
                     {isRunning && info.slurm_job_info?.job_id && handleCancelFlow && (
                       <Button
                         onClick={() => handleCancelFlow(info.id)}

@@ -104,6 +104,7 @@ class SlurmJobInfo(BaseModel):
 
 
 class FlowRunInfo(BaseModel):
+    name: str
     id: uuid.UUID
     state: StateType | None = None
     slurm_job_info: SlurmJobInfo | None = None
@@ -151,6 +152,7 @@ async def get_running_flows():
             # Extract flow run IDs and states
             flow_run_infos = [
                 FlowRunInfo(
+                    name=flow_run.name,
                     id=flow_run.id,
                     state=flow_run.state.type,
                     slurm_job_info=block,
