@@ -11,4 +11,5 @@ export enum StateType {
 export type FlowRunInfo = {
   id: string
   state: StateType | null
+  job_id: string | null
 }

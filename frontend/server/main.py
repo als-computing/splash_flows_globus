@@ -1,9 +1,11 @@
+import asyncio
 import uuid
 from datetime import timedelta
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from prefect.blocks.system import JSON
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.filters import (
     FlowFilter,
@@ -98,6 +100,7 @@ FLOW_NAME = "nersc_streaming_flow"
 class FlowRunInfo(BaseModel):
     id: uuid.UUID
     state: StateType | None = None
+    job_id: str | None = None
 
 
 class FlowRunsResponse(BaseModel):
@@ -108,7 +111,6 @@ class FlowRunsResponse(BaseModel):
 async def get_running_flows():
     try:
         async with get_client() as client:
-            # Create a flow filter to filter by flow name
             flow_filter = FlowFilter(name=FlowFilterName(any_=[FLOW_NAME]))
             flow_run_filter = FlowRunFilter(
                 state=FlowRunFilterState(
@@ -123,15 +125,30 @@ async def get_running_flows():
                 )
             )
 
-            # Get flow runs using the filter
             flow_runs = await client.read_flow_runs(
                 flow_filter=flow_filter, flow_run_filter=flow_run_filter
             )
 
+            async def load_block_safely(run_id):
+                try:
+                    block = await JSON.load(f"{run_id}-metadata")
+                    return block.value.get("job_id")
+                except Exception:
+                    return None
+
+            # Wait for all tasks to complete
+            job_ids = await asyncio.gather(
+                *[asyncio.create_task(load_block_safely(run.id)) for run in flow_runs]
+            )
+
             # Extract flow run IDs and states
             flow_run_infos = [
-                FlowRunInfo(id=flow_run.id, state=flow_run.state.type)
-                for flow_run in flow_runs
+                FlowRunInfo(
+                    id=flow_run.id,
+                    state=flow_run.state.type,
+                    job_id=job_id,
+                )
+                for flow_run, job_id in zip(flow_runs, job_ids)
             ]
 
             return FlowRunsResponse(flow_run_infos=flow_run_infos)

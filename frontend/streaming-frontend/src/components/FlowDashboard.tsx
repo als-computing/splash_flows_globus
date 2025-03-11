@@ -32,7 +32,7 @@ export function FlowDashboard() {
           setError(errorMessage)
         } else if (err instanceof Error) {
           setError(err.message)
-        } else {
+        } else { 
           setError('Unexpected error occurred')
         }
         console.error('Error launching flow:', err)
@@ -40,7 +40,7 @@ export function FlowDashboard() {
     })
   }
 
-  const handleCancelFlow = () => {
+  const handleCancelFlow = (flowId: string) => {
     if (!flowId) return
     setError(null)
     cancelFlowMutation.mutate(flowId, {
@@ -69,7 +69,7 @@ export function FlowDashboard() {
             launchFlowMutation={launchFlowMutation}
             cancelFlowMutation={cancelFlowMutation}
             handleLaunchFlow={handleLaunchFlow}
-            handleCancelFlow={handleCancelFlow}
+            handleCancelFlow={() => flowId && handleCancelFlow(flowId)}
           />
           
           <div className="pt-6 border-t">
@@ -77,6 +77,8 @@ export function FlowDashboard() {
               flowRunInfos={flowRunInfos}
               isFetchingFlows={isFetchingFlows}
               refetchFlowRuns={refetchFlowRuns}
+              cancelFlowMutation={cancelFlowMutation}
+              handleCancelFlow={handleCancelFlow}
             />
           </div>
           
