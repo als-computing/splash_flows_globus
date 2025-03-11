@@ -5,6 +5,13 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from prefect.client.orchestration import get_client
+from prefect.client.schemas.filters import (
+    FlowFilter,
+    FlowFilterName,
+    FlowRunFilter,
+    FlowRunFilterState,
+    FlowRunFilterStateType,
+)
 from prefect.client.schemas.objects import State, StateType
 from prefect.client.schemas.responses import SetStateStatus
 from prefect.exceptions import PrefectException
@@ -79,6 +86,55 @@ async def cancel_flow(flow_run_id: uuid.UUID):
             return CancelFlowResponse(
                 message=f"Flow run '{flow_run_id}' was successfully cancelled."
             )
+    except PrefectException as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+FLOW_NAME = "nersc_streaming_flow"
+
+
+class FlowRunInfo(BaseModel):
+    id: uuid.UUID
+    state: StateType | None = None
+
+
+class FlowRunsResponse(BaseModel):
+    flow_run_infos: list[FlowRunInfo]
+
+
+@app.get("/flows/running", response_model=FlowRunsResponse)
+async def get_running_flows():
+    try:
+        async with get_client() as client:
+            # Create a flow filter to filter by flow name
+            flow_filter = FlowFilter(name=FlowFilterName(any_=[FLOW_NAME]))
+            flow_run_filter = FlowRunFilter(
+                state=FlowRunFilterState(
+                    type=FlowRunFilterStateType(
+                        any_=[
+                            StateType.SCHEDULED,
+                            StateType.PENDING,
+                            StateType.RUNNING,
+                            StateType.CANCELLING,
+                        ]
+                    )
+                )
+            )
+
+            # Get flow runs using the filter
+            flow_runs = await client.read_flow_runs(
+                flow_filter=flow_filter, flow_run_filter=flow_run_filter
+            )
+
+            # Extract flow run IDs and states
+            flow_run_infos = [
+                FlowRunInfo(id=flow_run.id, state=flow_run.state.type)
+                for flow_run in flow_runs
+            ]
+
+            return FlowRunsResponse(flow_run_infos=flow_run_infos)
     except PrefectException as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:

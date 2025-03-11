@@ -202,7 +202,10 @@ def save_block(job_id: str) -> JSON:
     return block
 
 
-@flow(name="nersc_streaming_flow", on_cancellation=[cancellation_hook], log_prints=True)
+FLOW_NAME = "nersc_streaming_flow"
+
+
+@flow(name=FLOW_NAME, on_cancellation=[cancellation_hook], log_prints=True)
 def nersc_streaming_flow(
     walltime: datetime.timedelta = datetime.timedelta(minutes=5),
     monitor_interval: int = 10,
