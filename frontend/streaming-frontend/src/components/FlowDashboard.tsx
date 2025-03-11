@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useFlowAPI } from '../hooks/useFlowAPI'
 import { FlowList } from './FlowList'
-import { FlowControls } from './FlowControls'
+import { LuanchFlowButton } from './LaunchFlowButton'
 import axios from 'axios'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -67,7 +67,7 @@ export function FlowDashboard() {
           <CardTitle>Flow Controls</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <FlowControls 
+          <LuanchFlowButton 
             flowId={flowId}
             launchFlowMutation={launchFlowMutation}
             cancelFlowMutation={cancelFlowMutation}
