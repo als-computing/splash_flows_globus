@@ -19,6 +19,7 @@ from prefect.client.schemas.responses import SetStateStatus
 from prefect.exceptions import PrefectException
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sfapi_client.jobs import JobState
 
 app = FastAPI()
 
@@ -97,10 +98,15 @@ async def cancel_flow(flow_run_id: uuid.UUID):
 FLOW_NAME = "nersc_streaming_flow"
 
 
+class SlurmJobInfo(BaseModel):
+    job_id: str | None = None
+    job_state: JobState | None = None
+
+
 class FlowRunInfo(BaseModel):
     id: uuid.UUID
     state: StateType | None = None
-    job_id: str | None = None
+    slurm_job_info: SlurmJobInfo | None = None
 
 
 class FlowRunsResponse(BaseModel):
@@ -129,15 +135,16 @@ async def get_running_flows():
                 flow_filter=flow_filter, flow_run_filter=flow_run_filter
             )
 
-            async def load_block_safely(run_id):
+            async def load_block_safely(run_id) -> SlurmJobInfo | None:
                 try:
                     block = await JSON.load(f"{run_id}-metadata")
-                    return block.value.get("job_id")
+
+                    return SlurmJobInfo(**block.value)
                 except Exception:
                     return None
 
             # Wait for all tasks to complete
-            job_ids = await asyncio.gather(
+            blocks = await asyncio.gather(
                 *[asyncio.create_task(load_block_safely(run.id)) for run in flow_runs]
             )
 
@@ -146,9 +153,9 @@ async def get_running_flows():
                 FlowRunInfo(
                     id=flow_run.id,
                     state=flow_run.state.type,
-                    job_id=job_id,
+                    slurm_job_info=block,
                 )
-                for flow_run, job_id in zip(flow_runs, job_ids)
+                for flow_run, block in zip(flow_runs, blocks)
             ]
 
             return FlowRunsResponse(flow_run_infos=flow_run_infos)

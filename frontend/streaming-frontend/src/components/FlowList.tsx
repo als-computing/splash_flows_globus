@@ -60,10 +60,15 @@ export function FlowList() {
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex flex-col">
                         <span className="font-mono text-sm">{info.id}</span>
-                        {info.job_id && (
-                          <span className="font-mono text-xs text-muted-foreground">
-                            Slurm Job ID: {info.job_id}
-                          </span>
+                        {info.slurm_job_info?.job_id && (
+                          <>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              Slurm Job ID: {info.slurm_job_info.job_id}
+                            </span>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              Slurm Job Status: {info.slurm_job_info.job_state}
+                            </span>
+                          </>
                         )}
                       </div>
                       <span
@@ -72,7 +77,7 @@ export function FlowList() {
                         {info.state || "Unknown"}
                       </span>
                     </div>
-                    {isRunning && info.job_id && handleCancelFlow && (
+                    {isRunning && info.slurm_job_info?.job_id && handleCancelFlow && (
                       <Button
                         onClick={() => handleCancelFlow(info.id)}
                         disabled={isCancelling || isCancelled}

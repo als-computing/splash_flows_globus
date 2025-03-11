@@ -14,11 +14,16 @@ from sfapi_client.jobs import JobState, TERMINAL_STATES
 from sfapi_client.exceptions import SfApiError
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import BaseModel, model_validator
 from authlib.jose import JsonWebKey
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sfapi_client import Client
+
+
+class SlurmJobBlock(BaseModel):
+    job_id: str | None = None
+    job_state: JobState | None = None
 
 
 # We have this in case we want to test out the flow without
@@ -74,13 +79,16 @@ def monitor_streaming_job(
     logger.info(f"Monitoring streaming job {job_id}...")
     perlmutter = client.compute(Machine.perlmutter)
     retries = 0
-    max_retries = 3
+    max_retries = 5
+    slurm_job_block = SlurmJobBlock(job_id=job_id)
 
     while True:
         try:
             job = perlmutter.job(jobid=job_id)
             job.update()
             status = job.state
+            slurm_job_block.job_state = status
+            save_block(slurm_job_block)
 
         # noticed that there can be a delay sometimes in the job being found
         # so we retry a few times before giving up
@@ -196,9 +204,9 @@ def cancellation_hook(flow: Flow, flow_run: FlowRun, state: State):
     meta.delete(name=block_name)
 
 
-def save_block(job_id: str) -> JSON:
-    block = JSON(value={"job_id": job_id})
-    block.save(name=f"{flow_run.get_id()}-metadata")
+def save_block(slurm_block: SlurmJobBlock) -> JSON:
+    block = JSON(value=slurm_block.model_dump())
+    block.save(name=f"{flow_run.get_id()}-metadata", overwrite=True)
     return block
 
 
@@ -223,7 +231,8 @@ def nersc_streaming_flow(
     )
 
     logger.info("Saving job ID to metadata block...")
-    save_block(job_id)
+
+    save_block(SlurmJobBlock(job_id=job_id))
 
     success = monitor_streaming_job(
         client=client,

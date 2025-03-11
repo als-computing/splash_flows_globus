@@ -139,6 +139,18 @@ wheels = [
 ]
 
 [[package]]
+name = "authlib"
+version = "1.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/36/aa/e1c199d27ea06a13f9641746a9b19f15bd75b04b40b6bd72a89156c75d10/authlib-1.5.1.tar.gz", hash = "sha256:5cbc85ecb0667312c1cdc2f9095680bb735883b123fb509fde1e65b1c5df972e", size = 152534 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/ae/4d289407515223677e7d105ec88bc707a115cce79464c6b56313beb0dd36/authlib-1.5.1-py2.py3-none-any.whl", hash = "sha256:8408861cbd9b4ea2ff759b00b6f02fd7d81ac5a56d0b2b22c08606c6049aae11", size = 231358 },
+]
+
+[[package]]
 name = "cachetools"
 version = "5.5.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1749,6 +1761,7 @@ dependencies = [
     { name = "griffe" },
     { name = "prefect" },
     { name = "pydantic-settings" },
+    { name = "sfapi-client" },
 ]
 
 [package.dev-dependencies]
@@ -1762,10 +1775,27 @@ requires-dist = [
     { name = "griffe", specifier = ">=1.6.0" },
     { name = "prefect", specifier = "~=2.0" },
     { name = "pydantic-settings", specifier = ">=2.8.1" },
+    { name = "sfapi-client", specifier = ">=0.4.1" },
 ]
 
 [package.metadata.requires-dev]
 lint = [{ name = "ruff", specifier = ">=0.9.10" }]
+
+[[package]]
+name = "sfapi-client"
+version = "0.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "authlib" },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "tenacity" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/55/35/3f3f2d073b8876dbf4b8732ecaa3fa3a4db0637e2712fd57e51ade64c401/sfapi_client-0.4.1.tar.gz", hash = "sha256:a15b220e1de6eea6148bde9ffb46e0fabfffe4117d40d2c3d4014262bcdf23c3", size = 56249 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7d/51/76b92f640812e70429b8ca04d5a9c2d0eb63e615add4a84585b18f7b948b/sfapi_client-0.4.1-py3-none-any.whl", hash = "sha256:a8e74108c257106ddb956f17eda856c46e0d6f4003c5f9e2bff276f9a24e6340", size = 44772 },
+]
 
 [[package]]
 name = "shellingham"
@@ -1846,6 +1876,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/04/1b/52b27f2e13ceedc79a908e29eac426a63465a1a01248e5f24aa36a62aeb3/starlette-0.46.1.tar.gz", hash = "sha256:3c88d58ee4bd1bb807c0d1acb381838afc7752f9ddaec81bbe4383611d833230", size = 2580102 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/4b/528ccf7a982216885a1ff4908e886b8fb5f19862d1962f56a3fce2435a70/starlette-0.46.1-py3-none-any.whl", hash = "sha256:77c74ed9d2720138b25875133f3a2dae6d854af2ec37dceb56aef370c1d8a227", size = 71995 },
+]
+
+[[package]]
+name = "tenacity"
+version = "9.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/94/91fccdb4b8110642462e653d5dcb27e7b674742ad68efd146367da7bdb10/tenacity-9.0.0.tar.gz", hash = "sha256:807f37ca97d62aa361264d497b0e31e92b8027044942bfa756160d908320d73b", size = 47421 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/cb/b86984bed139586d01532a587464b5805f12e397594f19f931c4c2fbfa61/tenacity-9.0.0-py3-none-any.whl", hash = "sha256:93de0c98785b27fcf659856aa9f54bfbd399e29969b0621bc7f762bd441b4539", size = 28169 },
 ]
 
 [[package]]

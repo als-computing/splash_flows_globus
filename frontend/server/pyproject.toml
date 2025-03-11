@@ -9,6 +9,7 @@ dependencies = [
     "griffe>=1.6.0",
     "prefect~=2.0",
     "pydantic-settings>=2.8.1",
+    "sfapi-client>=0.4.1",
 ]
 
 [dependency-groups]
