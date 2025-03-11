@@ -5,7 +5,7 @@ import { LuanchFlowButton } from './LaunchFlowButton'
 import axios from 'axios'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ExclamationTriangleIcon, CheckCircledIcon } from "@radix-ui/react-icons"
+import { ExclamationTriangleIcon } from "@radix-ui/react-icons"
 
 export function FlowDashboard() {
   const [flowId, setFlowId] = useState<string | null>(null)
@@ -90,12 +90,6 @@ export function FlowDashboard() {
             </Alert>
           )}
           
-          {cancelFlowMutation.data?.message && (
-            <Alert variant="success" className="bg-green-50 border-green-200">
-              <CheckCircledIcon className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-600">{cancelFlowMutation.data.message}</AlertDescription>
-            </Alert>
-          )}
         </CardContent>
       </Card>
     </div>
