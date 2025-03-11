@@ -5,7 +5,7 @@ export enum StateType {
   COMPLETED = "COMPLETED",
   FAILED = "FAILED",
   CANCELLED = "CANCELLED",
-  CRASH = "CRASH"
+  CRASH = "CRASH",
 }
 
 export type FlowRunInfo = {
