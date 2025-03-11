@@ -9,7 +9,6 @@ export function useFlowAPI() {
   const { 
     data: flowRunInfos = [], 
     isLoading: isFetchingFlows,
-    refetch: refetchFlowRuns 
   } = useQuery({
     queryKey: ['flowRuns'],
     queryFn: async () => {
@@ -48,7 +47,6 @@ export function useFlowAPI() {
   return {
     flowRunInfos,
     isFetchingFlows,
-    refetchFlowRuns,
     launchFlowMutation,
     cancelFlowMutation
   }
