@@ -1,15 +1,16 @@
 import { Card, CardContent } from "@/components/ui/card"
-import { FlowList } from "./FlowList"
-import { LaunchFlowButton } from "./LaunchFlowButton"
 import { useFlowAPI } from "@/hooks/useFlowAPI"
 import { PrefectState } from "@/types/flowTypes"
+import { FlowList } from "./FlowList"
+import { LaunchFlowButton } from "./LaunchFlowButton"
 
 export function FlowDashboard() {
   const { flowRunInfos } = useFlowAPI()
-  
+
   // Check if there's any running job
-  const anyRunningJob = flowRunInfos.some(info => 
-    info.state === PrefectState.RUNNING && info.slurm_job_info?.job_id
+  const anyRunningJob = flowRunInfos.some(
+    (info) =>
+      info.state === PrefectState.RUNNING && info.slurm_job_info?.job_id,
   )
 
   return (

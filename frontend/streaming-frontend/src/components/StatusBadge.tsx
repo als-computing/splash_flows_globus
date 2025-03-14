@@ -1,5 +1,10 @@
 import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { PrefectState, SlurmJobState } from "@/types/flowTypes"
 
 type StatusBadgeProps = {
@@ -13,7 +18,7 @@ export function StatusBadge({ status, type, flowId, jobId }: StatusBadgeProps) {
   // Helper function to determine badge variant based on status
   const getBadgeVariant = () => {
     if (!status) return "outline"
-    
+
     if (type === "prefect") {
       switch (status) {
         case PrefectState.RUNNING:
@@ -32,33 +37,32 @@ export function StatusBadge({ status, type, flowId, jobId }: StatusBadgeProps) {
         default:
           return "outline"
       }
-    } else {
-      // Slurm states
-      if (status === SlurmJobState.RUNNING) return "success"
-      if (status === SlurmJobState.COMPLETED) return "success"
-      if (
-        [
-          SlurmJobState.FAILED,
-          SlurmJobState.BOOT_FAIL,
-          SlurmJobState.NODE_FAIL,
-          SlurmJobState.OUT_OF_MEMORY,
-          SlurmJobState.TIMEOUT,
-        ].includes(status as SlurmJobState)
-      ) {
-        return "destructive"
-      }
-      if (
-        [
-          SlurmJobState.CANCELLED,
-          SlurmJobState.STOPPED,
-          SlurmJobState.SUSPENDED,
-        ].includes(status as SlurmJobState)
-      ) {
-        return "warning"
-      }
-      if (status === SlurmJobState.PENDING) return "secondary"
-      return "outline"
     }
+    // Slurm states
+    if (status === SlurmJobState.RUNNING) return "success"
+    if (status === SlurmJobState.COMPLETED) return "success"
+    if (
+      [
+        SlurmJobState.FAILED,
+        SlurmJobState.BOOT_FAIL,
+        SlurmJobState.NODE_FAIL,
+        SlurmJobState.OUT_OF_MEMORY,
+        SlurmJobState.TIMEOUT,
+      ].includes(status as SlurmJobState)
+    ) {
+      return "destructive"
+    }
+    if (
+      [
+        SlurmJobState.CANCELLED,
+        SlurmJobState.STOPPED,
+        SlurmJobState.SUSPENDED,
+      ].includes(status as SlurmJobState)
+    ) {
+      return "warning"
+    }
+    if (status === SlurmJobState.PENDING) return "secondary"
+    return "outline"
   }
 
   // Get tooltip content based on state type
@@ -83,13 +87,14 @@ export function StatusBadge({ status, type, flowId, jobId }: StatusBadgeProps) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge variant={getBadgeVariant()} className="text-xs whitespace-nowrap uppercase">
+          <Badge
+            variant={getBadgeVariant()}
+            className="text-xs whitespace-nowrap uppercase"
+          >
             {type}
           </Badge>
         </TooltipTrigger>
-        <TooltipContent>
-          {getTooltipContent()}
-        </TooltipContent>
+        <TooltipContent>{getTooltipContent()}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )

@@ -5,10 +5,12 @@ import { useState } from "react"
 import { ErrorAlert } from "./ErrorAlert"
 
 interface LaunchFlowButtonProps {
-  isJobRunning?: boolean;
+  isJobRunning?: boolean
 }
 
-export function LaunchFlowButton({ isJobRunning = false }: LaunchFlowButtonProps) {
+export function LaunchFlowButton({
+  isJobRunning = false,
+}: LaunchFlowButtonProps) {
   const [error, setError] = useState<string | null>(null)
   const { launchFlowMutation } = useFlowAPI()
 
@@ -35,7 +37,7 @@ export function LaunchFlowButton({ isJobRunning = false }: LaunchFlowButtonProps
 
   // Don't render the button if a job is running
   if (isJobRunning) {
-    return null;
+    return null
   }
 
   return (
