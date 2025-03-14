@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/tooltip"
 import { PrefectState, SlurmJobState } from "@/types/flowTypes"
 
+// TODO: could probably do better typing this out...
 type StatusBadgeProps = {
   status: PrefectState | SlurmJobState | string | null
   type: "prefect" | "slurm"

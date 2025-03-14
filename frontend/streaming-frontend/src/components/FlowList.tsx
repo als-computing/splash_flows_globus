@@ -54,7 +54,13 @@ export function FlowList() {
       {flowRunInfos.length > 0 && (
         <ul className="space-y-2">
           {flowRunInfos.map((info, index) => {
-            const isRunning = info.state === PrefectState.RUNNING
+            const isPrefectRunning = info.state === PrefectState.RUNNING
+            const isSlurmRunning =
+              info.slurm_job_info?.job_id &&
+              info.slurm_job_info.job_state === "RUNNING"
+            const title = isSlurmRunning
+              ? "Streaming is ready. You can collect data."
+              : "Getting things set up. Please wait."
             const isCancelling =
               cancelFlowMutation?.isPending &&
               cancelFlowMutation.variables === info.id
@@ -69,7 +75,9 @@ export function FlowList() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex flex-col">
-                    <span className="font-mono text-sm">{info.name}</span>
+                    {isPrefectRunning && (
+                      <span className="font-mono text-sm">{title}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {info.slurm_job_info?.job_id && (
@@ -87,7 +95,7 @@ export function FlowList() {
                   </div>
                 </div>
 
-                {isRunning && info.slurm_job_info?.job_id && (
+                {isPrefectRunning && info.slurm_job_info?.job_id && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
