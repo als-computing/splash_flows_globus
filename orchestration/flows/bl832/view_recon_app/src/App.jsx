@@ -10,34 +10,40 @@
  * @return {JSX.Element} A full-page layout with a header and auto-resizing iframe.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Header } from './Header';
 import ItkVtkViewerComponent from './ItkVtkViewerComponent';
-
 import './App.css';
 
 function App() {
+  // Store the file URL in state so that it can be updated by Header.
+  const [fileUrl, setFileUrl] = useState(
+    'http://localhost:8000/zarr/v2/rec20240425_104614_nist-sand-30-100_27keV_z8mm_n2625'
+  );
 
-  // TODO: Load the file URL from Tiled
+  // Extract filename safely.
+  const fileName = fileUrl.split('/').pop() || '';
 
-  // Tiled file URL
-  // to start tiled:
-  // TILED_ALLOW_ORIGINS="http://localhost:3000 http://localhost:5174 http://localhost:8082" tiled serve directory "../../../data/tomo/scratch/" --public --verbose
-  const file_url = 'http://localhost:8000/zarr/v2/rec20230606_152011_jong-seto_fungal-mycelia_flat-AQ_fungi2_fast';
-  const fileName = file_url.split('/').pop();
-  
-  // itk-vtk-viewer iframe source
-  // to start: run "itk-vtk-viewer --port 8082" in the terminal (base)
-  const iframeSrc =
-    'http://localhost:8082/?fileToLoad='+file_url;
+  // Callback that receives the new file URL from Header/TiledWidget.
+  const handleSelect = (newFileUrl) => {
+    console.log("App received new fileUrl:", newFileUrl);
+    // Update state only if a new, non-empty URL is returned.
+    if (newFileUrl && newFileUrl !== fileUrl) {
+      setFileUrl(newFileUrl);
+    }
+  };
+
+  // Build the iframe source URL.
+  const iframeSrc = 'http://localhost:8082/?fileToLoad=' + fileUrl;
 
   return (
     <div id="app">
       <Header 
-        logoUrl='/images/als_logo_wheel.png'
+        logoUrl="/images/als_logo_wheel.png"
         title="Tomography Visualizer powered by itk-vtk-viewer"
-        fileName={fileName}>
-      </Header>
+        fileName={fileName}
+        onSelect={handleSelect}
+      />
       <ItkVtkViewerComponent
         src={iframeSrc}
         height="100%"
