@@ -17,9 +17,9 @@ export function useFlowAPI() {
 
   // Launch flow mutation
   const launchFlowMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (params: { walltime: number }) => {
       const response = await axios.post("http://localhost:8000/flows/launch", {
-        walltime_minutes: 5,
+        walltime_minutes: params.walltime,
       })
       return response.data
     },
@@ -28,7 +28,6 @@ export function useFlowAPI() {
       queryClient.invalidateQueries({ queryKey: ["flowRuns"] })
     },
   })
-
   // Cancel flow mutation
   const cancelFlowMutation = useMutation({
     mutationFn: async (flowId: string) => {
