@@ -2,6 +2,7 @@ import datetime
 import json
 import pathlib
 import time
+from typing import cast
 
 from prefect import Flow, flow, get_run_logger
 from prefect.logging.loggers import flow_run_logger
@@ -10,7 +11,7 @@ from prefect.blocks.system import JSON
 from prefect.runtime import flow_run
 from sfapi_client import Client as SFAPI_Client
 from sfapi_client.compute import Machine
-from sfapi_client.jobs import JobState, TERMINAL_STATES
+from sfapi_client.jobs import JobState, TERMINAL_STATES, JobSacct
 from sfapi_client.exceptions import SfApiError
 from pathlib import Path
 
@@ -24,6 +25,8 @@ from sfapi_client import Client
 class SlurmJobBlock(BaseModel):
     job_id: str | None = None
     job_state: JobState | None = None
+    timelimit: str | None = None
+    elapsed: str | None = None
 
 
 # We have this in case we want to test out the flow without
@@ -84,10 +87,12 @@ def monitor_streaming_job(
 
     while True:
         try:
-            job = perlmutter.job(jobid=job_id)
+            job: JobSacct = cast(JobSacct, perlmutter.job(jobid=job_id))
             job.update()
             status = job.state
             slurm_job_block.job_state = status
+            slurm_job_block.elapsed = job.elapsed
+            slurm_job_block.timelimit = job.timelimit
             save_block(slurm_job_block)
 
         # noticed that there can be a delay sometimes in the job being found

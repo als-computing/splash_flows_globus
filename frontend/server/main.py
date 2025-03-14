@@ -101,6 +101,8 @@ FLOW_NAME = "nersc_streaming_flow"
 class SlurmJobInfo(BaseModel):
     job_id: str | None = None
     job_state: JobState | None = None
+    timelimit: str | None = None
+    elapsed: str | None = None
 
 
 class FlowRunInfo(BaseModel):

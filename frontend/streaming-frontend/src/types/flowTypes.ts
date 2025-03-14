@@ -40,6 +40,8 @@ export enum SlurmJobState {
 export type SlurmJobInfo = {
   job_id: string | null
   job_state: SlurmJobState
+  timelimit: string | null
+  elapsed: string | null
 }
 
 export type FlowRunInfo = {
