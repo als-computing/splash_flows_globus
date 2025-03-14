@@ -4,7 +4,11 @@ import axios from "axios"
 import { useState } from "react"
 import { ErrorAlert } from "./ErrorAlert"
 
-export function LaunchFlowButton() {
+interface LaunchFlowButtonProps {
+  isJobRunning?: boolean;
+}
+
+export function LaunchFlowButton({ isJobRunning = false }: LaunchFlowButtonProps) {
   const [error, setError] = useState<string | null>(null)
   const { launchFlowMutation } = useFlowAPI()
 
@@ -27,6 +31,11 @@ export function LaunchFlowButton() {
         console.error("Error launching flow:", err)
       },
     })
+  }
+
+  // Don't render the button if a job is running
+  if (isJobRunning) {
+    return null;
   }
 
   return (
