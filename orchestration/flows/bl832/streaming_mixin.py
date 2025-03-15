@@ -144,9 +144,10 @@ mkdir -p {pscratch_path}/streaming_tomography_reconstructions
 
 echo "Starting streaming container..."
 podman-hpc run --rm \
+    --gpu \
+    --network=host \
     --volume {DOTENV_FILE}:/app/.env \
     --volume {DATA_DIR}:/mnt/outputs \
-    --gpu \
     --shm-size=50G \
     samwelborn/als-tomocupy-stream-recon:latest
 """
