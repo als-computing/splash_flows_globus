@@ -11,21 +11,16 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFlowAPI } from "@/hooks/useFlowAPI"
+import { PrefectState } from "@/types/flowTypes"
 import axios from "axios"
 import { useState } from "react"
 import { ErrorAlert } from "./ErrorAlert"
 
-interface LaunchFlowButtonProps {
-  isJobRunning?: boolean
-}
-
-export function LaunchFlowButton({
-  isJobRunning = false,
-}: LaunchFlowButtonProps) {
+export function LaunchFlowButton() {
   const [error, setError] = useState<string | null>(null)
-  const [walltime, setWalltime] = useState<number>(60) // Default 60 minutes
+  const [walltime, setWalltime] = useState<number>(60)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const { launchFlowMutation } = useFlowAPI()
+  const { launchFlowMutation, flowRunInfos } = useFlowAPI()
 
   const handleLaunchFlow = () => {
     setError(null)
@@ -54,8 +49,18 @@ export function LaunchFlowButton({
     )
   }
 
-  // Don't render the button if a job is running
-  if (isJobRunning) {
+  // Don't render the button if a prefect flow is active and hasn't been canceled
+  if (
+    flowRunInfos.some(
+      (info) =>
+        info.state !== null &&
+        [
+          PrefectState.RUNNING,
+          PrefectState.SCHEDULED,
+          PrefectState.PENDING,
+        ].includes(info.state),
+    )
+  ) {
     return null
   }
 

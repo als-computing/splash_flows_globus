@@ -21,7 +21,7 @@ import { StatusBadge } from "./StatusBadge"
 export function FlowList() {
   const [error, setError] = useState<string | null>(null)
   const [flowToCancel, setFlowToCancel] = useState<string | null>(null)
-  const { cancelFlowMutation, flowRunInfos, isFetchingFlows } = useFlowAPI()
+  const { cancelFlowMutation, flowRunInfos } = useFlowAPI()
 
   const handleCancelConfirm = () => {
     if (!flowToCancel) return
@@ -143,10 +143,6 @@ export function FlowList() {
             )
           })}
         </ul>
-      )}
-
-      {flowRunInfos.length === 0 && !isFetchingFlows && (
-        <p className="text-center text-muted-foreground">No flow runs found.</p>
       )}
     </div>
   )
