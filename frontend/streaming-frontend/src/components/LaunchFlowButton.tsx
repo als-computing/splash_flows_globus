@@ -13,22 +13,32 @@ import { Label } from "@/components/ui/label"
 import { useFlowAPI } from "@/hooks/useFlowAPI"
 import { PrefectState } from "@/types/flowTypes"
 import axios from "axios"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ErrorAlert } from "./ErrorAlert"
 
 export function LaunchFlowButton() {
   const [error, setError] = useState<string | null>(null)
   const [walltime, setWalltime] = useState<number>(60)
+  const [inputWalltime, setInputWalltime] = useState<number>(60)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const { launchFlowMutation, flowRunInfos } = useFlowAPI()
+
+  // Sync input walltime with the main walltime when dialog opens
+  useEffect(() => {
+    if (isDialogOpen) {
+      setInputWalltime(walltime)
+    }
+  }, [isDialogOpen, walltime])
 
   const handleLaunchFlow = () => {
     setError(null)
     setIsDialogOpen(false)
+    // Update the main walltime value from input when launching
+    setWalltime(inputWalltime)
 
     // Pass the walltime to the mutation
     launchFlowMutation.mutate(
-      { walltime },
+      { walltime: inputWalltime },
       {
         onError: (err) => {
           if (axios.isAxiosError(err)) {
@@ -94,9 +104,9 @@ export function LaunchFlowButton() {
                 id="walltime"
                 type="number"
                 min="1"
-                value={walltime}
+                value={inputWalltime}
                 onChange={(e) =>
-                  setWalltime(Number.parseInt(e.target.value) || 60)
+                  setInputWalltime(Number.parseInt(e.target.value) || 60)
                 }
                 className="col-span-3"
               />
