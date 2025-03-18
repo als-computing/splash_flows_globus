@@ -1,23 +1,30 @@
-import { PrefectState, SlurmJobState, FlowRunInfo } from "../types/flowTypes"
+import {
+  type FlowRunInfo,
+  PrefectState,
+  SlurmJobState,
+} from "../types/flowTypes"
+import { CancelFlowDialog } from "./CancelFlowDialog"
 import { SlurmJobTime } from "./SlurmJobTime"
 import { StatusBadge } from "./StatusBadge"
-import { CancelFlowDialog } from "./CancelFlowDialog"
 
 type FlowListItemProps = {
   info: FlowRunInfo
 }
 
 export function FlowListItem({ info }: FlowListItemProps) {
-  const isPrefectRunning = info.state === PrefectState.RUNNING || info.state === PrefectState.SCHEDULED || info.state === PrefectState.PENDING
+  const isPrefectRunning =
+    info.state === PrefectState.RUNNING ||
+    info.state === PrefectState.SCHEDULED ||
+    info.state === PrefectState.PENDING
   const isPrefectShuttingDown = info.state === PrefectState.CANCELLING
   const isSlurmRunning: boolean = Boolean(
     info.slurm_job_info?.job_id &&
-      info.slurm_job_info.job_state === SlurmJobState.RUNNING
+      info.slurm_job_info.job_state === SlurmJobState.RUNNING,
   )
-  
+
   // Determine the appropriate title message
   let title = "Getting things set up. Please wait."
-  
+
   if (isPrefectShuttingDown) {
     title = "Shutting things down. You can launch another session."
   } else if (isSlurmRunning) {
@@ -48,11 +55,7 @@ export function FlowListItem({ info }: FlowListItemProps) {
               jobId={info.slurm_job_info.job_id}
             />
           )}
-          <StatusBadge
-            status={info.state}
-            type="prefect"
-            flowId={info.id}
-          />
+          <StatusBadge status={info.state} type="prefect" flowId={info.id} />
         </div>
       </div>
 

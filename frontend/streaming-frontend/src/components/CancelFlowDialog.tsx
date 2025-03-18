@@ -22,14 +22,16 @@ export function CancelFlowDialog({ flowId }: CancelFlowDialogProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { cancelFlowMutation } = useFlowAPI()
-  
-  const isCancelling = cancelFlowMutation.isPending && cancelFlowMutation.variables === flowId
-  const isCancelled = cancelFlowMutation.data?.message && cancelFlowMutation.variables === flowId
-  
+
+  const isCancelling =
+    cancelFlowMutation.isPending && cancelFlowMutation.variables === flowId
+  const isCancelled =
+    cancelFlowMutation.data?.message && cancelFlowMutation.variables === flowId
+
   const handleCancelClick = () => {
     setIsOpen(true)
   }
-  
+
   const handleCancelConfirm = () => {
     setError(null)
     cancelFlowMutation.mutate(flowId, {
@@ -56,12 +58,8 @@ export function CancelFlowDialog({ flowId }: CancelFlowDialogProps) {
 
   return (
     <>
-      {error && (
-        <div className="text-red-500 text-sm mt-1 mb-2">
-          {error}
-        </div>
-      )}
-      
+      {error && <div className="text-red-500 text-sm mt-1 mb-2">{error}</div>}
+
       <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
         <AlertDialogTrigger asChild>
           <Button
@@ -77,8 +75,8 @@ export function CancelFlowDialog({ flowId }: CancelFlowDialogProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel Session</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel this session? This
-              action cannot be undone.
+              Are you sure you want to cancel this session? This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
