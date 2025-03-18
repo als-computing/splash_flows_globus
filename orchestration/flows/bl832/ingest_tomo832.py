@@ -27,7 +27,7 @@ from orchestration.flows.scicat.utils import (
     Severity
 )
 
-DEFAULT_USER = "8.3.2" # In case there's not proposal number
+DEFAULT_USER = "8.3.2"  # In case there's not proposal number
 UNKNWON_EMAIL = "unknown@example.com"
 ingest_spec = "als832_dx_3"
 
@@ -102,9 +102,10 @@ def ingest(
         upload_data_block(
             scicat_client,
             file_path,
-            dataset_id, 
+            dataset_id,
             INGEST_STORAGE_ROOT_PATH,
-            INGEST_SOURCE_ROOT_PATH)
+            INGEST_SOURCE_ROOT_PATH
+        )
 
         thumbnail_file = build_thumbnail(file["/exchange/data"][0])
         encoded_thumbnail = encode_image_2_thumbnail(thumbnail_file)
@@ -112,7 +113,8 @@ def ingest(
             scicat_client,
             encoded_thumbnail,
             dataset_id,
-            ownable)
+            ownable
+        )
 
         return dataset_id
 
@@ -181,7 +183,7 @@ def upload_data_block(
     source_root_path: str
 ) -> Datablock:
     "Creates a datablock of files"
-    # calcularte the path where the file will as known to SciCat
+    # calculate the path where the file will as known to SciCat
     storage_path = str(file_path).replace(source_root_path, storage_root_path)
     datafiles = create_data_files(file_path, storage_path)
 
@@ -190,7 +192,6 @@ def upload_data_block(
         dataFileList=datafiles
     )
     return scicat_client.upload_dataset_origdatablock(dataset_id, datablock)
-
 
 
 def upload_attachment(
@@ -361,7 +362,8 @@ if __name__ == "__main__":
             os.environ.get("SCICAT_INGEST_USER"),
             os.environ.get("SCICAT_INGEST_PASSWORD"),
         ),
-        "/Users/dylanmcreynolds/data/beamlines/8.3.2/raw/20231013_065251_MSB_Book1_Proj77_Cell3_Gen2_Li_R2G_FastCharge_DuringCharge0.h5",
+        "/Users/dylanmcreynolds/data/beamlines/8.3.2/raw/"
+        "20231013_065251_MSB_Book1_Proj77_Cell3_Gen2_Li_R2G_FastCharge_DuringCharge0.h5",
         [],
         log_level="DEBUG",
     )

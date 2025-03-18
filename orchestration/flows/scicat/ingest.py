@@ -7,6 +7,7 @@ from prefect import flow, task, get_run_logger
 
 from orchestration.flows.scicat.utils import Issue
 
+
 @flow(name="scicat_dataset_ingest")
 def ingest_dataset(file_path: str, ingestor: str):
     """ Ingest a file into SciCat.
@@ -23,7 +24,7 @@ def ingest_dataset(file_path: str, ingestor: str):
 
 @task(name="ingest_scicat")
 def ingest_dataset_task(file_path: str, ingestor_module: str):
-    """ Ingest a file into SciCat. 
+    """ Ingest a file into SciCat.
 
     Parameters
     ----------
@@ -37,10 +38,9 @@ def ingest_dataset_task(file_path: str, ingestor_module: str):
     SCICAT_INGEST_USER = os.getenv("SCICAT_INGEST_USER")
     SCICAT_INGEST_PASSWORD = os.getenv("SCICAT_INGEST_PASSWORD")
 
+    # files come in with the full pasth on the server that they
+    # were loaded from.
 
-    # files come in with the full pasth on the server that they 
-    # were loaded from. 
-    
     # relative path: raw/...
     # ingestor api maps /globa/cfs/cdirs/als/data_mover to /data_mover
     # so we want to prepend /data_mover/8.3.2

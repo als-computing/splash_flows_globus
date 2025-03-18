@@ -37,21 +37,20 @@ def add_mock_requests(mock_request):
 
 def test_np_encoder():
     test_dict = {"dont_panic": np.array([1, 2, 3], dtype=np.int8)}
-    assert json.dumps(test_dict, cls=NPArrayEncoder) 
+    assert json.dumps(test_dict, cls=NPArrayEncoder)
 
- 
     test_dict = {"dont_panic": np.array([1, 2, 3], dtype=np.float32)}
     assert json.dumps(test_dict, cls=NPArrayEncoder)
 
     test_dict = {"dont_panic": np.full((1, 1), np.inf)}
-    
+
     # requests doesn't allow strings  that have np.inf or np.nan
     # so the NPArrayEncoder needs to return both as None
     encoded_np = json.loads(
             json.dumps(test_dict, cls=NPArrayEncoder)
     )
     assert json.dumps(encoded_np, allow_nan=False)
- 
+
 
 def test_build_search_terms():
     terms = build_search_terms("Time-is_an illusion. Lunchtime/2x\\so.")
