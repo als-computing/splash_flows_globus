@@ -124,8 +124,8 @@ class NerscStreamingMixin:
 #SBATCH -q realtime
 #SBATCH -A als
 #SBATCH -C gpu
-#SBATCH --job-name=streaming-tomo-recon
 #SBATCH --output={pscratch_path}/streaming_logs/%x_%j.out
+#SBATCH --job-name=streaming_tomo_recon
 #SBATCH -N 1
 #SBATCH --time={time_format}
 #SBATCH --exclusive
