@@ -109,7 +109,7 @@ class NerscStreamingMixin:
         user = client.user()
         pscratch_path = f"/pscratch/sd/{user.name[0]}/{user.name}"
         home_dir = f"/global/homes/{user.name[0]}/{user.name}"
-        DATA_DIR = f"{pscratch_path}/streaming_tomography_reconstructions"
+        DATA_DIR = f"{pscratch_path}/streaming_reconstructions"
         DOTENV_FILE = f"{home_dir}/gits/als-epics-streaming/operators/832/recon/.env"
         
 
