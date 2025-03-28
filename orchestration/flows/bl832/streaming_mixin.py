@@ -118,23 +118,20 @@ class NerscStreamingMixin:
         minutes = (total_seconds % 3600) // 60
 
         time_format = f"{hours}:{minutes:02d}:00"
+        current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Define the streaming job script
         job_script = f"""#!/bin/bash
 #SBATCH -q realtime
 #SBATCH -A als
 #SBATCH -C gpu
-#SBATCH --output={pscratch_path}/streaming_logs/%x_%j.out
-#SBATCH --job-name=streaming_tomo_recon
+#SBATCH --job-name={current_time}_streaming_tomo_recon
+#SBATCH --output=/global/cfs/cdirs/als/data_mover/8.3.2/streaming_logs/%x_%j.out
 #SBATCH -N 1
 #SBATCH --time={time_format}
 #SBATCH --exclusive
 
 date
-echo "Creating log directory {pscratch_path}/streaming_logs"
-mkdir -p {pscratch_path}/streaming_logs
-mkdir -p {pscratch_path}/streaming_tomography_reconstructions
-
 echo "Starting streaming container..."
 podman-hpc run --rm \
     --gpu \
