@@ -1,6 +1,5 @@
 import datetime
 import json
-import pathlib
 import time
 from typing import cast
 
@@ -15,7 +14,7 @@ from sfapi_client.jobs import JobState, TERMINAL_STATES, JobSacct
 from sfapi_client.exceptions import SfApiError
 from pathlib import Path
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 from authlib.jose import JsonWebKey
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -36,30 +35,6 @@ class NerscStreamingSettings(BaseSettings):
     PATH_NERSC_CLIENT_ID: Path = Path("~/.superfacility/client_id.txt")
     CLIENT_ID: str | None = None
     PATH_NERSC_PRI_KEY: Path = Path("~/.superfacility/client_secret.json")
-
-    @model_validator(mode="after")
-    def validate_sfapi_paths(self) -> "NerscStreamingSettings":
-        self.PATH_NERSC_CLIENT_ID = (
-            pathlib.Path(self.PATH_NERSC_CLIENT_ID).expanduser().resolve(strict=True)
-        )
-        self.PATH_NERSC_PRI_KEY = (
-            pathlib.Path(self.PATH_NERSC_PRI_KEY).expanduser().resolve(strict=True)
-        )
-        if (
-            not self.PATH_NERSC_CLIENT_ID.exists()
-            or not self.PATH_NERSC_PRI_KEY.exists()
-        ):
-            raise FileNotFoundError("NERSC credential files are missing.")
-
-        self.CLIENT_ID = self.PATH_NERSC_CLIENT_ID.read_text().strip()
-
-        pri_key = self.PATH_NERSC_PRI_KEY.read_text()
-        try:
-            JsonWebKey.import_key(json.loads(pri_key))
-        except Exception as e:
-            raise ValueError(f"Failed to import NERSC private key: {e}")
-
-        return self
 
     def create_sfapi_client(self) -> Client:
         try:
