@@ -22,7 +22,7 @@ from sfapi_client import Client
 
 
 class SlurmJobBlock(BaseModel):
-    job_id: str | None = None
+    job_id: str
     job_state: JobState | None = None
     timelimit: str | None = None
     elapsed: str | None = None
