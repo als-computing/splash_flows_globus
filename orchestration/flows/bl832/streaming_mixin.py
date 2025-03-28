@@ -139,7 +139,7 @@ podman-hpc run --rm \
     --volume {DOTENV_FILE}:/app/.env \
     --volume {DATA_DIR}:/mnt/outputs \
     --shm-size=50G \
-    samwelborn/als-tomocupy-stream-recon:latest
+    als-computing/streamtomocupy-recon:latest
 """
         logger.info(job_script)
 
