@@ -136,6 +136,7 @@ class NerscStreamingMixin:
         home_dir = f"/global/homes/{user.name[0]}/{user.name}"
         DATA_DIR = f"{pscratch_path}/streaming_tomography_reconstructions"
         DOTENV_FILE = f"{home_dir}/gits/als-epics-streaming/operators/832/recon/.env"
+        
 
         total_seconds = int(walltime.total_seconds())
         hours = total_seconds // 3600
@@ -145,7 +146,7 @@ class NerscStreamingMixin:
 
         # Define the streaming job script
         job_script = f"""#!/bin/bash
-#SBATCH -q debug
+#SBATCH -q realtime
 #SBATCH -A als
 #SBATCH -C gpu
 #SBATCH --job-name=streaming-tomo-recon
