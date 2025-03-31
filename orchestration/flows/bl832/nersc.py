@@ -16,7 +16,7 @@ from sfapi_client.compute import Machine
 from orchestration.flows.bl832.config import Config832
 from orchestration.flows.bl832.job_controller import get_controller, HPC, TomographyHPCController
 from orchestration.transfer_controller import get_transfer_controller, CopyMethod
-from orchestration.flows.bl832.streaming_mixin import NerscStreamingMixin, cancellation_hook, monitor_streaming_job, save_block
+from orchestration.flows.bl832.streaming_mixin import NerscStreamingMixin, SlurmJobBlock, cancellation_hook, monitor_streaming_job, save_block
 from orchestration.prefect import schedule_prefect_flow
 
 logger = logging.getLogger(__name__)
@@ -511,7 +511,7 @@ def nersc_streaming_flow(
     ) # type: ignore
     
     job_id = controller.start_streaming_service(walltime=walltime)
-    save_block(job_id)
+    save_block(SlurmJobBlock(job_id=job_id))
     
     success = monitor_streaming_job(
         client=controller.client, 
