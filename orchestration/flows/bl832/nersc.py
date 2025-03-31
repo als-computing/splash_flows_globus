@@ -498,11 +498,11 @@ def nersc_recon_flow(
 
 @flow(name="nersc_streaming_flow", on_cancellation=[cancellation_hook])
 def nersc_streaming_flow(
-    config: Config832,
     walltime: datetime.timedelta = datetime.timedelta(minutes=5),
     monitor_interval: int = 10,
 ) -> bool:
     logger = get_run_logger()
+    config = Config832()
     logger.info(f"Starting NERSC streaming flow with {walltime} walltime")
     
     controller: NERSCTomographyHPCController = get_controller(
