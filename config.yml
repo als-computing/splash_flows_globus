@@ -84,10 +84,15 @@ globus:
       uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
       name: nersc832_alsdev_recon_scripts
 
+    # nersc832:
+    #   root_path: /global/cfs/cdirs/als/data_mover/8.3.2
+    #   uri: nersc.gov
+    #   uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
+    #   name: nersc832
     nersc832:
-      root_path: /global/cfs/cdirs/als/data_mover/8.3.2
+      root_path: /global/homes/a/alsdev/test_directory_xchong/
       uri: nersc.gov
-      uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
+      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
       name: nersc832
 
     nersc7012:
@@ -101,18 +106,6 @@ globus:
       uri: hpc.lbl.gov
       uuid: 639c49be-604f-423c-9c5d-82a53afe1bf1
       name: data7012
-    
-    my_personal_endpoint:
-      root_path: /
-      uri: d2-64-21-a-39-b8.dhcp.lbnl.us
-      uuid: c393493e-08fb-11f0-84e1-02e7762f0123
-      name: my_personal_endpoint
-
-    nersc_destination:
-      root_path: /global/homes/x/xchong/globus_test/
-      uri: nersc.gov
-      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58  # This is NERSC's endpoint UUID
-      name: nersc_destination
 
   globus_apps:
     als_transfer:
