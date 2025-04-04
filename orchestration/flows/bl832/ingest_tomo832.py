@@ -27,9 +27,9 @@ from orchestration.flows.scicat.utils import (
     Severity
 )
 
-DEFAULT_USER = "8.3.2" # In case there's not proposal number
-UNKNWON_EMAIL = "unknown@example.com"
-ingest_spec = "als832_dx_3"
+DEFAULT_USER = "8.3.2"  # In case there's not proposal number
+UNKNOWN_EMAIL = "unknown@example.com"
+ingest_spec = "als832_dx_4"  # "als832_dx_3"
 
 logger = logging.getLogger("scicat_ingest")
 
@@ -102,7 +102,7 @@ def ingest(
         upload_data_block(
             scicat_client,
             file_path,
-            dataset_id, 
+            dataset_id,
             INGEST_STORAGE_ROOT_PATH,
             INGEST_SOURCE_ROOT_PATH)
 
@@ -130,11 +130,11 @@ def upload_raw_dataset(
     file_name = scicat_metadata.get("/measurement/sample/file_name")
     description = build_search_terms(file_name)
     appended_keywords = description.split()
-
+    logger.info(f"email: {scicat_metadata.get('/measurement/sample/experimenter/email')}")
     dataset = RawDataset(
         owner=scicat_metadata.get("/measurement/sample/experiment/pi") or "Unknown",
         contactEmail=clean_email(scicat_metadata.get("/measurement/sample/experimenter/email"))
-        or "Unknown",
+        or "unknown@example.com",
         creationLocation=scicat_metadata.get("/measurement/instrument/instrument_name")
         or "Unknown",
         datasetName=file_name,
@@ -190,7 +190,6 @@ def upload_data_block(
         dataFileList=datafiles
     )
     return scicat_client.upload_dataset_origdatablock(dataset_id, datablock)
-
 
 
 def upload_attachment(
@@ -267,14 +266,60 @@ def _get_data_sample(file, sample_size=10):
     return data_sample
 
 
-def clean_email(email: str):
-    if email:
-        if not email or email.upper() == "NONE":
-            # this is a brutal case, but the beamline sometimes puts in "None" and
-            # the new scicat backend hates that.
-            return UNKNWON_EMAIL
-        return email.replace(" ", "").replace(",", "").replace("'", "")
-    return None
+# TODO: Move clean_email() to the scicat_beamline repository
+# https://github.com/als-computing/scicat_beamline
+def clean_email(email: any) -> str:
+    """
+    Clean the provided email address.
+
+    This function ensures that the input is a valid email address.
+    It returns a default email if:
+      - The input is not a string,
+      - The input is empty after stripping,
+      - The input equals "NONE" (case-insensitive), or
+      - The input does not contain an "@" symbol.
+
+    Parameters
+    ----------
+    email : any
+        The raw email value extracted from metadata.
+
+    Returns
+    -------
+    str
+        A cleaned email address if valid, otherwise the default unknown email.
+
+    Example
+    -------
+    >>> clean_email("  user@example.com  ")
+    'user@example.com'
+    >>> clean_email("garbage")
+    'unknown@example.com'
+    >>> clean_email(None)
+    'unknown@example.com'
+    """
+    # Check that the email is a string
+    if not isinstance(email, str):
+        logger.info(f"Input email is not a string. Returning {UNKNOWN_EMAIL}")
+        return UNKNOWN_EMAIL
+
+    # Remove surrounding whitespace
+    cleaned = email.strip()
+
+    # Fallback if the email is empty, equals "NONE", or lacks an "@" symbol
+    if not cleaned or cleaned.upper() == "NONE" or "@" not in cleaned:
+        logger.info(f"Invalid email address. Returning {UNKNOWN_EMAIL}")
+        return UNKNOWN_EMAIL
+
+    # Optionally, remove spaces from inside the email (typically invalid in an email address)
+    cleaned = cleaned.replace(" ", "")
+
+    # Final verification: ensure that the cleaned email contains "@".
+    if "@" not in cleaned:
+        logger.info(f"Invalid email address: {cleaned}. Returning {UNKNOWN_EMAIL}")
+        return UNKNOWN_EMAIL
+
+    return cleaned
 
 
 scicat_metadata_keys = [
@@ -303,10 +348,12 @@ scientific_metadata_keys = [
     "/measurement/instrument/detector/pixel_size",
     "/measurement/instrument/detector/temperature",
     "/measurement/instrument/monochromator/setup/Z2",
-    "/measurement/instrument/monochromator/setup/temperature_tc2",
-    "/measurement/instrument/monochromator/setup/temperature_tc3",
-    "/measurement/instrument/slits/setup/hslits_A_Door",
-    "/measurement/instrument/slits/setup/hslits_A_Wall",
+    # NOTE: These are commented out because they are no longer present in the h5 file as of March 25, 2025
+    # Keeping them commented out in case they are needed in the future
+    # "/measurement/instrument/monochromator/setup/temperature_tc2",
+    # "/measurement/instrument/monochromator/setup/temperature_tc3",
+    # "/measurement/instrument/slits/setup/hslits_A_Door",
+    # "/measurement/instrument/slits/setup/hslits_A_Wall",
     "/measurement/instrument/slits/setup/hslits_center",
     "/measurement/instrument/slits/setup/hslits_size",
     "/measurement/instrument/slits/setup/vslits_Lead_Flag",
@@ -352,16 +399,32 @@ data_sample_keys = [
 ]
 
 
+def test_ingest_raw_tomo() -> bool:
+    from orchestration.flows.scicat.ingest import ingest_dataset
+    TOMO_INGESTOR_MODULE = "orchestration.flows.bl832.ingest_tomo832"
+    file_path = "examples/tomo_scan_no_email.h5"
+    print(f"Ingesting {file_path} with {TOMO_INGESTOR_MODULE}")
+    try:
+        ingest_dataset(file_path, TOMO_INGESTOR_MODULE)
+        return True
+    except Exception as e:
+        print(f"SciCat ingest failed with {e}")
+        return False
+
+
 if __name__ == "__main__":
-    ingest(
-        ScicatClient(
-            # "http://localhost:3000/api/v3",
-            os.environ.get("SCICAT_API_URL"),
-            None,
-            os.environ.get("SCICAT_INGEST_USER"),
-            os.environ.get("SCICAT_INGEST_PASSWORD"),
-        ),
-        "/Users/dylanmcreynolds/data/beamlines/8.3.2/raw/20231013_065251_MSB_Book1_Proj77_Cell3_Gen2_Li_R2G_FastCharge_DuringCharge0.h5",
-        [],
-        log_level="DEBUG",
-    )
+    # ingest(
+    #     ScicatClient(
+    #         # "http://localhost:3000/api/v3",
+    #         os.environ.get("SCICAT_API_URL"),
+    #         None,
+    #         os.environ.get("SCICAT_INGEST_USER"),
+    #         os.environ.get("SCICAT_INGEST_PASSWORD"),
+    #     ),
+    #     "/Users/dylanmcreynolds/data/beamlines/8.3.2/raw/"
+    #     "20231013_065251_MSB_Book1_Proj77_Cell3_Gen2_Li_R2G_FastCharge_DuringCharge0.h5",
+    #     [],
+    #     log_level="DEBUG",
+    # )
+
+    test_ingest_raw_tomo()
