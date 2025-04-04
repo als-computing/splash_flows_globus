@@ -266,6 +266,8 @@ def _get_data_sample(file, sample_size=10):
     return data_sample
 
 
+# TODO: Move clean_email() to the scicat_beamline repository
+# https://github.com/als-computing/scicat_beamline
 def clean_email(email: any) -> str:
     """
     Clean the provided email address.

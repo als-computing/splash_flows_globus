@@ -34,8 +34,7 @@ def ingest_dataset_task(file_path: str, ingestor_module: str):
         Thy python module that contains the ingest function, e.g. "foo.bar.ingestor"
     """
     logger = get_run_logger()
-    import dotenv
-    dotenv.load_dotenv()
+
     SCICAT_API_URL = os.getenv("SCICAT_API_URL")
     SCICAT_INGEST_USER = os.getenv("SCICAT_INGEST_USER")
     SCICAT_INGEST_PASSWORD = os.getenv("SCICAT_INGEST_PASSWORD")
@@ -60,6 +59,9 @@ def ingest_dataset_task(file_path: str, ingestor_module: str):
     except Exception as e:
         logger.warning(f"Failed to create SciCat client using pyscicat method: {e}")
 
+    # Note: the above method does not work with the current SciCat API (March 2025)
+    # The following method is used instead as a workaround, however, this will be udpated soon in pyscicat
+    # Ref: https://github.com/SciCatProject/pyscicat/pull/62
     try:
         import requests
         from urllib.parse import urljoin
