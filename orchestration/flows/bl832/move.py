@@ -11,7 +11,7 @@ from orchestration.flows.scicat.ingest import ingest_dataset
 from orchestration.flows.bl832.config import Config832
 from orchestration.globus.transfer import GlobusEndpoint, start_transfer
 from orchestration.prefect import schedule_prefect_flow
-from orchestration.prometheus_utils import push_metrics_to_prometheus
+
 
 API_KEY = os.getenv("API_KEY")
 TOMO_INGESTOR_MODULE = "orchestration.flows.bl832.ingest_tomo832"
@@ -47,6 +47,35 @@ def transfer_spot_to_data(
 
 @task(name="transfer_data_to_nersc")
 def transfer_data_to_nersc(
+    file_path: str,
+    transfer_client: TransferClient,
+    data832: GlobusEndpoint,
+    nersc832: GlobusEndpoint,
+):
+    logger = get_run_logger()
+
+    # if source_file begins with "/", it will mess up os.path.join
+    if file_path[0] == "/":
+        file_path = file_path[1:]
+    source_path = os.path.join(data832.root_path, file_path)
+    dest_path = os.path.join(nersc832.root_path, file_path)
+
+    logger.info(f"Transferring {dest_path} data832 to nersc")
+
+    success = start_transfer(
+        transfer_client,
+        data832,
+        source_path,
+        nersc832,
+        dest_path,
+        max_wait_seconds=600,
+        logger=logger,
+    )
+
+    return success
+
+@task(name="transfer_data_to_nersc")
+def transfer_data_to_ners_by_controller(
     file_path: str,
     transfer_client: TransferClient,
     data832: GlobusEndpoint,
@@ -184,19 +213,32 @@ def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
     # test_scicat(config)
     logger.info(f"{str(uuid.uuid4())}{file_path}")
     # copy file to a uniquely-named file in the same folder
-    #file = Path(file_path)
-    # new_file = str(file.with_name(f"test_{str(uuid.uuid4())}.txt"))
-    # logger.info(new_file)
-    # success = start_transfer(
-    #     config.tc, config.spot832, file_path, config.spot832, new_file, logger=logger
-    # )
-    # logger.info(success)
-    # spot832_path = transfer_spot_to_data(
-    #     file_path, config.tc, config.spot832, config.data832
-    # )
-    # logger.info(f"Transferred {spot832_path} to spot to data")
+    file = Path(file_path)
+    new_file = str(file.with_name(f"test_{str(uuid.uuid4())}.txt"))
+    logger.info(new_file)
+    success = start_transfer(
+        config.tc, config.spot832, file_path, config.spot832, new_file, logger=logger
+    )
+    logger.info(success)
+    spot832_path = transfer_spot_to_data(
+        new_file, config.tc, config.spot832, config.data832
+    )
+    logger.info(f"Transferred {spot832_path} to spot to data")
 
-    task = transfer_data_to_nersc(file_path, config.tc, config.data832, config.nersc832)
+    task = transfer_data_to_nersc(new_file, config.tc, config.data832, config.nersc832)
+    logger.info(
+        f"File successfully transferred from data832 to NERSC {spot832_path}. Task {task}"
+    )
+
+
+@flow(name="test_832_transfers")
+def test_transfers_832_grafana(file_path: str = "/raw/transfer_tests/test.txt"):
+    logger = get_run_logger()
+    config = Config832()
+
+    logger.info(f"{str(uuid.uuid4())}{file_path}")
+
+    task = transfer_data_to_ners_by_controller(file_path, config.tc, config.data832, config.nersc_alsdev)
 
     logger.info(
         f"File successfully transferred from data832 to NERSC {file_path}. Task {task}"

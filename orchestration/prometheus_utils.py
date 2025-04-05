@@ -67,20 +67,6 @@ def push_metrics_to_prometheus(metrics, logger):
             logger.info(f"Successfully pushed metrics to Pushgateway at {PUSHGATEWAY_URL}")
         except Exception as push_error:
             logger.error(f"Error pushing to Pushgateway at {PUSHGATEWAY_URL}: {push_error}")
-            # Try alternative URL if primary fails
-            alternative_url = os.environ.get('ALTERNATIVE_PUSHGATEWAY_URL', 'http://127.0.0.1:9091')
-            if alternative_url != PUSHGATEWAY_URL:
-                try:
-                    logger.info(f"Trying alternative Pushgateway URL: {alternative_url}")
-                    push_to_gateway(
-                        alternative_url,
-                        job=JOB_NAME,
-                        registry=registry,
-                        grouping_key={'instance': INSTANCE_LABEL}
-                    )
-                    logger.info(f"Successfully pushed metrics to alternative Pushgateway")
-                except Exception as alt_error:
-                    logger.error(f"Error pushing to alternative Pushgateway: {alt_error}")
                     
     except Exception as e:
         logger.error(f"Error preparing metrics for Prometheus: {e}")

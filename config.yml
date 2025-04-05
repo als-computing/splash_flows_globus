@@ -49,7 +49,7 @@ globus:
       name: alcf_home832
 
     nersc_alsdev:
-      root_path: /global/homes/a/alsdev/test_directory/
+      root_path: /global/homes/a/alsdev/test_directory_xchong/
       uri: nersc.gov
       uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
       name: nersc_alsdev
@@ -84,15 +84,10 @@ globus:
       uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
       name: nersc832_alsdev_recon_scripts
 
-    # nersc832:
-    #   root_path: /global/cfs/cdirs/als/data_mover/8.3.2
-    #   uri: nersc.gov
-    #   uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
-    #   name: nersc832
     nersc832:
-      root_path: /global/homes/a/alsdev/test_directory_xchong/
+      root_path: /global/cfs/cdirs/als/data_mover/8.3.2
       uri: nersc.gov
-      uuid: d40248e6-d874-4f7b-badd-2c06c16f1a58
+      uuid: df82346e-9a15-11ea-b3c4-0ae144191ee3
       name: nersc832
 
     nersc7012:
