@@ -322,7 +322,6 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         source_path = os.path.join(source.root_path, file_path)
         dest_path = os.path.join(destination.root_path, file_path)
         logger.info(f"Transferring {source_path} to {dest_path}")
-        logger.info(f"File size: {file_size} bytes")
 
         # Start the timer
         transfer_start_time = time.time()
