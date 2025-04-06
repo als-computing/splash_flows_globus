@@ -90,7 +90,6 @@ class TransferController(Generic[Endpoint], ABC):
         config: Config832
     ) -> None:
         self.config = config
-        self.logger = logger
 
     @abstractmethod
     def copy(
@@ -161,7 +160,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             filename = os.path.basename(file_path)
             
             # Log the actual paths we're using
-            self.logger.info(f"Getting file size for: {filename} in directory: {directory_path} on endpoint {endpoint.name} ({endpoint.uuid})")
+            logger.info(f"Getting file size for: {filename} in directory: {directory_path} on endpoint {endpoint.name} ({endpoint.uuid})")
             
             # For paths that start with 'raw', make sure we use the correct full path
             # This is the exact path in the endpoint, not relative to root_path
@@ -180,20 +179,20 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
                     directory_path = directory_path[1:]
                 globus_dir_path = os.path.join(endpoint.root_path, directory_path)
             
-            self.logger.info(f"Listing directory on Globus endpoint: {globus_dir_path}")
+            logger.info(f"Listing directory on Globus endpoint: {globus_dir_path}")
             
             # Try listing the directory
             try:
                 response = transfer_client.operation_ls(endpoint.uuid, path=globus_dir_path)
             except globus_sdk.GlobusAPIError as e:
-                self.logger.error(f"First attempt failed: {e}")
+                logger.error(f"First attempt failed: {e}")
                 
                 # Try with just raw directory_path as a fallback
-                self.logger.info(f"Trying fallback with direct path: {directory_path}")
+                logger.info(f"Trying fallback with direct path: {directory_path}")
                 try:
                     response = transfer_client.operation_ls(endpoint.uuid, path=directory_path)
                 except globus_sdk.GlobusAPIError as second_e:
-                    self.logger.error(f"Second attempt also failed: {second_e}")
+                    logger.error(f"Second attempt also failed: {second_e}")
                     
                     # Try with just a bare path as a last resort
                     if directory_path.startswith('raw/'):
@@ -201,25 +200,25 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
                     else:
                         bare_path = f"/{directory_path}"
                         
-                    self.logger.info(f"Trying last resort with bare path: {bare_path}")
+                    logger.info(f"Trying last resort with bare path: {bare_path}")
                     response = transfer_client.operation_ls(endpoint.uuid, path=bare_path)
             
             # Find the file in the response and get its size
             for item in response:
                 if item['name'] == filename:
-                    self.logger.info(f"Found file: {filename}, size: {item['size']} bytes")
+                    logger.info(f"Found file: {filename}, size: {item['size']} bytes")
                     return item['size']
             
             # If the file wasn't found after looking through the directory
-            self.logger.warning(f"File '{filename}' not found in directory listing of '{globus_dir_path}'")
+            logger.warning(f"File '{filename}' not found in directory listing of '{globus_dir_path}'")
             return 0
             
         except globus_sdk.GlobusAPIError as e:
-            self.logger.error(f"Globus API error when getting file size: {e}")
-            self.logger.error(f"Failed to get size for {file_path} on endpoint {endpoint.name}")
+            logger.error(f"Globus API error when getting file size: {e}")
+            logger.error(f"Failed to get size for {file_path} on endpoint {endpoint.name}")
             return 0
         except Exception as e:
-            self.logger.error(f"Error getting file size: {e}")
+            logger.error(f"Error getting file size: {e}")
             return 0
 
     def collect_and_push_metrics(
@@ -271,10 +270,10 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             }
             
             # Push metrics to Prometheus
-            push_metrics_to_prometheus(metrics, self.logger)
+            push_metrics_to_prometheus(metrics, logger)
             
         except Exception as e:
-            self.logger.error(f"Error collecting or pushing metrics: {e}")
+            logger.error(f"Error collecting or pushing metrics: {e}")
 
     def copy(
         self,
@@ -298,14 +297,14 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             bool: True if the transfer was successful, False otherwise.
         """
         if not file_path:
-            self.logger.error("No file_path provided")
+            logger.error("No file_path provided")
             return False
             
         if not source or not destination:
-            self.logger.error("Source or destination endpoint not provided")
+            logger.error("Source or destination endpoint not provided")
             return False
 
-        self.logger.info(f"Transferring {file_path} from {source.name} to {destination.name}")
+        logger.info(f"Transferring {file_path} from {source.name} to {destination.name}")
 
         # Remove leading slash if present
         if file_path[0] == "/":
@@ -318,12 +317,12 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         file_size = 0
         if collect_metrics:
             file_size = self.get_file_size(file_path, source)
-            self.logger.info(f"File size: {file_size} bytes")
+            logger.info(f"File size: {file_size} bytes")
 
         source_path = os.path.join(source.root_path, file_path)
         dest_path = os.path.join(destination.root_path, file_path)
-        self.logger.info(f"Transferring {source_path} to {dest_path}")
-        self.logger.info(f"File size: {file_size} bytes")
+        logger.info(f"Transferring {source_path} to {dest_path}")
+        logger.info(f"File size: {file_size} bytes")
 
         # Start the timer
         transfer_start_time = time.time()
@@ -337,16 +336,16 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
                 dest_endpoint=destination,
                 dest_path=dest_path,
                 max_wait_seconds=600,
-                logger=self.logger,
+                logger=logger,
             )
             
             if success:
-                self.logger.info("Transfer completed successfully.")
+                logger.info("Transfer completed successfully.")
             else:
-                self.logger.error("Transfer failed.")
+                logger.error("Transfer failed.")
                 
         except globus_sdk.services.transfer.errors.TransferAPIError as e:
-            self.logger.error(f"Failed to submit transfer: {e}")
+            logger.error(f"Failed to submit transfer: {e}")
             
         finally:
             # Stop the timer and calculate the duration
@@ -354,8 +353,8 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             elapsed_time = transfer_end_time - transfer_start_time
             transfer_rate = file_size / elapsed_time if elapsed_time > 0 and file_size > 0 else 0
             
-            self.logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
-            self.logger.info(f"Transfer rate: {transfer_rate:.2f} bytes/second")
+            logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
+            logger.info(f"Transfer rate: {transfer_rate:.2f} bytes/second")
             
             # Collect and push metrics if enabled
             if collect_metrics:
@@ -375,24 +374,21 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
 
 
 class SimpleTransferController(TransferController[FileSystemEndpoint]):
+    def __init__(self, config: Config832) -> None:
+        super().__init__(config)
     """
     Use a simple 'cp' command to move data within the same system.
 
     Args:
         TransferController: Abstract class for transferring data.
     """
-    def __init__(
-        self,
-        config: Config832
-    ) -> None:
-        super().__init__(config)
 
     def copy(
         self,
         file_path: str = "",
         source: FileSystemEndpoint = None,
         destination: FileSystemEndpoint = None,
-        collect_metrics: bool = True,
+        collect_metrics: bool = False,
         machine_name: str = "local"
     ) -> bool:
         """
@@ -409,65 +405,39 @@ class SimpleTransferController(TransferController[FileSystemEndpoint]):
             bool: True if the transfer was successful, False otherwise.
         """
         if not file_path:
-            self.logger.error("No file_path provided.")
+            logger.error("No file_path provided.")
             return False
-            
         if not source or not destination:
-            self.logger.error("Source or destination endpoint not provided.")
+            logger.error("Source or destination endpoint not provided.")
             return False
 
-        self.logger.info(f"Transferring {file_path} from {source.name} to {destination.name}")
+        logger.info(f"Transferring {file_path} from {source.name} to {destination.name}")
 
-        # Remove leading slash if present
         if file_path.startswith("/"):
             file_path = file_path[1:]
 
-        # Record start time for metrics if collecting metrics
-        start_time = datetime.datetime.now()
-        
-        # Get file size before transfer if collecting metrics
-        file_size = 0
-        if collect_metrics:
-            try:
-                source_full_path = os.path.join(source.root_path, file_path)
-                file_size = os.path.getsize(source_full_path)
-                self.logger.info(f"File size: {file_size} bytes")
-            except (FileNotFoundError, OSError) as e:
-                self.logger.warning(f"Could not determine file size: {e}")
-
         source_path = os.path.join(source.root_path, file_path)
         dest_path = os.path.join(destination.root_path, file_path)
-        self.logger.info(f"Transferring {source_path} to {dest_path}")
+        logger.info(f"Transferring {source_path} to {dest_path}")
 
         # Start the timer
-        transfer_start_time = time.time()
-        success = False
+        start_time = time.time()
 
         try:
             result = os.system(f"cp -r '{source_path}' '{dest_path}'")
             if result == 0:
-                self.logger.info("Transfer completed successfully.")
-                success = True
+                logger.info("Transfer completed successfully.")
+                return True
             else:
-                self.logger.error(f"Transfer failed with exit code {result}.")
-                success = False
-                
+                logger.error(f"Transfer failed with exit code {result}.")
+                return False
         except Exception as e:
-            self.logger.error(f"Transfer failed: {e}")
-            success = False
-            
+            logger.error(f"Transfer failed: {e}")
+            return False
         finally:
             # Stop the timer and calculate the duration
-            transfer_end_time = time.time()
-            self.logger.info(f"Transfer process took {transfer_end_time - transfer_start_time:.2f} seconds.")
-            
-            # Collect and push metrics if enabled
-            if collect_metrics:
-                end_time = datetime.datetime.now()
-                if success:
-                    self.logger.info(f"Successfully transferred {file_size} bytes from {source.name} to {destination.name}")
-                
-            return success
+            elapsed_time = time.time() - start_time
+            logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
 
 
 class CopyMethod(Enum):
