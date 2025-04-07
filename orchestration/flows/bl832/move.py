@@ -232,7 +232,7 @@ def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
 
 
 @flow(name="test_832_transfers_grafana")
-def test_transfers_832_grafana(file_path: str = "/raw/transfer_tests/test.txt"):
+def test_transfers_832_grafana(file_path: str = "/raw/transfer_tests/test_xchong/"):
     logger = get_run_logger()
     config = Config832()
 

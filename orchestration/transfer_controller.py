@@ -131,96 +131,124 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         
     def get_file_size(
         self,
-        file_path: str,
+        path: str,
         endpoint: GlobusEndpoint,
-        transfer_client: Optional[globus_sdk.TransferClient] = None
+        transfer_client: Optional[globus_sdk.TransferClient] = None,
+        recursive: bool = True
     ) -> int:
         """
-        Get the size of a file on a Globus endpoint.
+        Get the size of a file or directory on a Globus endpoint.
         
         Args:
-            file_path (str): The path of the file on the endpoint.
-            endpoint (GlobusEndpoint): The Globus endpoint containing the file.
-            transfer_client (TransferClient, optional): A pre-configured TransferClient.
-                If None, uses self.config.tc.
+            path (str): Path to file or directory on the endpoint
+            endpoint (GlobusEndpoint): The Globus endpoint
+            transfer_client (TransferClient, optional): TransferClient instance
+            recursive (bool): Include subdirectories in size calculation
         
         Returns:
-            int: The file size in bytes, or 0 if unable to determine.
+            int: Size in bytes (0 if error)
         """
         if transfer_client is None:
             transfer_client = self.config.tc
             
         try:
-            # Strip leading slash if present
-            if file_path.startswith('/'):
-                file_path = file_path[1:]
-                
-            # Split the file path into directory and filename
-            directory_path = os.path.dirname(file_path)
-            filename = os.path.basename(file_path)
+            # Normalize path
+            path = path[1:] if path.startswith('/') else path
             
-            # Log the actual paths we're using
-            logger.info(f"Getting file size for: {filename} in directory: {directory_path} on endpoint {endpoint.name} ({endpoint.uuid})")
+            # Get the full Globus path
+            globus_path = self._get_full_globus_path(path, endpoint)
             
-            # For paths that start with 'raw', make sure we use the correct full path
-            # This is the exact path in the endpoint, not relative to root_path
-            globus_dir_path = directory_path
-            
-            # If endpoint has a root_path and the directory doesn't include it, we need the full path
-            # but ONLY if the endpoint doesn't automatically handle root_path in its configuration
-            if hasattr(endpoint, 'full_path'):
-                # Use full_path method if available (safer)
-                globus_dir_path = endpoint.full_path(directory_path)
-            else:
-                # Otherwise manually construct, but be careful about double-slashes
-                # root_path already includes the full absolute path on the endpoint
-                # Make sure there's no double-slash when joining paths
-                if endpoint.root_path.endswith('/') and directory_path.startswith('/'):
-                    directory_path = directory_path[1:]
-                globus_dir_path = os.path.join(endpoint.root_path, directory_path)
-            
-            logger.info(f"Listing directory on Globus endpoint: {globus_dir_path}")
-            
-            # Try listing the directory
+            # Try to get item details - first see if it's a file or directory
             try:
-                response = transfer_client.operation_ls(endpoint.uuid, path=globus_dir_path)
-            except globus_sdk.GlobusAPIError as e:
-                logger.error(f"First attempt failed: {e}")
+                # First try direct stat if endpoint supports it
+                item_info = transfer_client.operation_stat(endpoint.uuid, path=globus_path)
+                is_dir = item_info['type'] == 'dir'
+            except (globus_sdk.GlobusAPIError, KeyError):
+                # Fallback: check parent directory listing
+                parent_dir = os.path.dirname(path)
+                basename = os.path.basename(path)
                 
-                # Try with just raw directory_path as a fallback
-                logger.info(f"Trying fallback with direct path: {directory_path}")
+                # Handle case when path is root
+                if not parent_dir and not basename:
+                    is_dir = True
+                else:
+                    # Try to list parent directory
+                    parent_globus_path = self._get_full_globus_path(parent_dir, endpoint)
+                    try:
+                        parent_listing = transfer_client.operation_ls(endpoint.uuid, path=parent_globus_path)
+                        # Find our item
+                        item = next((i for i in parent_listing if i['name'] == basename), None)
+                        if not item:
+                            logger.warning(f"Path '{basename}' not found in directory '{parent_globus_path}'")
+                            return 0
+                        is_dir = item['type'] == 'dir'
+                    except globus_sdk.GlobusAPIError:
+                        # If we can't list parent, try direct listing - if it works, it's a directory
+                        try:
+                            transfer_client.operation_ls(endpoint.uuid, path=globus_path)
+                            is_dir = True
+                        except globus_sdk.GlobusAPIError:
+                            logger.error(f"Could not determine if {path} is file or directory")
+                            return 0
+            
+            # Calculate size based on type
+            if not is_dir:
+                # It's a file, get its size
                 try:
-                    response = transfer_client.operation_ls(endpoint.uuid, path=directory_path)
-                except globus_sdk.GlobusAPIError as second_e:
-                    logger.error(f"Second attempt also failed: {second_e}")
-                    
-                    # Try with just a bare path as a last resort
-                    if directory_path.startswith('raw/'):
-                        bare_path = directory_path
-                    else:
-                        bare_path = f"/{directory_path}"
+                    item_info = transfer_client.operation_stat(endpoint.uuid, path=globus_path)
+                    return item_info.get('size', 0)
+                except globus_sdk.GlobusAPIError:
+                    try:
+                        # Try listing parent directory as fallback
+                        parent_dir = os.path.dirname(path)
+                        basename = os.path.basename(path)
+                        parent_globus_path = self._get_full_globus_path(parent_dir, endpoint)
                         
-                    logger.info(f"Trying last resort with bare path: {bare_path}")
-                    response = transfer_client.operation_ls(endpoint.uuid, path=bare_path)
-            
-            # Find the file in the response and get its size
-            for item in response:
-                if item['name'] == filename:
-                    logger.info(f"Found file: {filename}, size: {item['size']} bytes")
-                    return item['size']
-            
-            # If the file wasn't found after looking through the directory
-            logger.warning(f"File '{filename}' not found in directory listing of '{globus_dir_path}'")
-            return 0
-            
-        except globus_sdk.GlobusAPIError as e:
-            logger.error(f"Globus API error when getting file size: {e}")
-            logger.error(f"Failed to get size for {file_path} on endpoint {endpoint.name}")
-            return 0
+                        parent_listing = transfer_client.operation_ls(endpoint.uuid, path=parent_globus_path)
+                        item = next((i for i in parent_listing if i['name'] == basename), None)
+                        return item.get('size', 0) if item else 0
+                    except:
+                        logger.error(f"Failed to get file size for {path}")
+                        return 0
+            else:
+                # It's a directory, calculate total size
+                total_size = 0
+                
+                try:
+                    # List directory contents
+                    dir_listing = transfer_client.operation_ls(endpoint.uuid, path=globus_path)
+                    
+                    # Process all items
+                    for item in dir_listing:
+                        if item['type'] == 'file':
+                            total_size += item.get('size', 0)
+                        elif item['type'] == 'dir' and recursive:
+                            # Recursively get subdirectory size
+                            subdir_path = os.path.join(path, item['name'])
+                            total_size += self.get_file_size(
+                                subdir_path, endpoint, transfer_client, recursive
+                            )
+                    
+                    return total_size
+                except globus_sdk.GlobusAPIError as e:
+                    logger.error(f"Failed to list directory {path}: {e}")
+                    return 0
+                
         except Exception as e:
-            logger.error(f"Error getting file size: {e}")
+            logger.error(f"Error getting path size: {e}")
             return 0
-
+            
+    def _get_full_globus_path(self, path: str, endpoint: GlobusEndpoint) -> str:
+        """Helper to get full path on Globus endpoint"""
+        if hasattr(endpoint, 'full_path'):
+            return endpoint.full_path(path)
+        elif hasattr(endpoint, 'root_path'):
+            # Manually construct path with root_path
+            if endpoint.root_path.endswith('/') and path.startswith('/'):
+                path = path[1:]
+            return os.path.join(endpoint.root_path, path)
+        return path
+    
     def collect_and_push_metrics(
         self,
         start_time: datetime.datetime,
