@@ -21,8 +21,8 @@ class FlowParameterMapper:
             "file_path",
             "is_export_control",
             "config"],
-        # Placeholder parameters for NERSC reconstruction
-        "nersc_recon/nersc_recon": [
+        # From nersc.py
+        "nersc_recon_flow/nersc_recon_flow": [
             "file_path",
             "is_export_control",
             "config"]  # Placeholder parameters for NERSC reconstruction
@@ -71,7 +71,7 @@ def setup_decision_settings(alcf_recon: bool, nersc_recon: bool, new_file_832: b
         # Define which flows to run based on the input settings
         settings = {
             "alcf_recon_flow/alcf_recon_flow": alcf_recon,
-            "nersc_recon/nersc_recon": nersc_recon,  # This is a placeholder for the NERSC reconstruction flow
+            "nersc_recon_flow/nersc_recon_flow": nersc_recon,
             "new_832_file_flow/new_file_832": new_file_832
         }
         # Save the settings in a JSON block for later retrieval by other flows
@@ -143,9 +143,9 @@ async def dispatcher(
         alcf_params = FlowParameterMapper.get_flow_parameters("alcf_recon_flow/alcf_recon_flow", available_params)
         tasks.append(run_specific_flow("alcf_recon_flow/alcf_recon_flow", alcf_params))
 
-    if decision_settings.value.get("nersc_recon/nersc_recon"):
-        nersc_params = FlowParameterMapper.get_flow_parameters("nersc_recon/nersc_recon", available_params)
-        tasks.append(run_specific_flow("nersc_recon/nersc_recon", nersc_params))
+    if decision_settings.value.get("nersc_recon_flow/nersc_recon_flow"):
+        nersc_params = FlowParameterMapper.get_flow_parameters("nersc_recon_flow/nersc_recon_flow", available_params)
+        tasks.append(run_specific_flow("nersc_recon_flow/nersc_recon_flow", nersc_params))
 
     # Run ALCF and NERSC flows in parallel, if any
     if tasks:
