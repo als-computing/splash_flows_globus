@@ -21,7 +21,7 @@ export TILED_ALLOW_ORIGINS="http://localhost:3000 http://localhost:${REACT_PORT}
 
 # Start Tiled server in the background (bind to all interfaces)
 echo "Starting Tiled server with data from ${DATA_DIR} on port ${TILED_PORT}..."
-tiled serve directory "${DATA_DIR}" --public --verbose --host 0.0.0.0 --port ${TILED_PORT} &
+tiled serve directory "${DATA_DIR}" --public --watch True --verbose --host 0.0.0.0 --port ${TILED_PORT} &
 TILED_PID=$!
 
 # Wait for Tiled to start
