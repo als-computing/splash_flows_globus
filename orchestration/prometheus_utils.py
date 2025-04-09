@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 from prometheus_client import Gauge, CollectorRegistry, push_to_gateway
 
 def push_metrics_to_prometheus(metrics, logger):
@@ -43,14 +44,14 @@ def push_metrics_to_prometheus(metrics, logger):
                              registry=registry)
         
         # Generate a unique execution ID for this transfer
-        execution_id = f"exec_{int(time.time() * 1000)}"
+        execution_id = f"exec_{str(uuid.uuid4())}"
         
         # Set the metrics
         request_counter.labels(execution_id=execution_id).set(1)
         bytes_counter.labels(execution_id=execution_id).set(metrics['bytes_transferred'])
         transfer_bytes.labels(status=metrics['status']).set(metrics['bytes_transferred'])
-        transfer_time.labels(machine=metrics['machine']).set(metrics['duration_seconds'])
-        transfer_speed.labels(machine=metrics['machine']).set(metrics['transfer_speed'])
+        transfer_time.labels(machine=metrics['status']).set(metrics['duration_seconds'])
+        transfer_speed.labels(machine=metrics['status']).set(metrics['transfer_speed'])
         
         # Log metrics for debugging
         logger.info(f"Pushing metrics: bytes_transferred={metrics['bytes_transferred']}")
