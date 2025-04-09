@@ -37,10 +37,14 @@ def prefect_test_fixture():
 
         decision_settings = JSON(value={
             "alcf_recon_flow/alcf_recon_flow": True,
-            "nersc_recon/nersc_recon": False,  # This is a placeholder for the NERSC reconstruction flow
+            "nersc_recon_flow/nersc_recon_flow": False,
             "new_832_file_flow/new_file_832": False
         })
         decision_settings.save(name="decision-settings")
+
+        alcf_allocation_root = JSON(value={"alcf-allocation-root-path": "/eagle/IRIProd/ALS"})
+        alcf_allocation_root.save(name="alcf-allocation-root-path")
+
         yield
 
 

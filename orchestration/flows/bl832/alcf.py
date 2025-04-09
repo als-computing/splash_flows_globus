@@ -33,6 +33,13 @@ class ALCFTomographyHPCController(TomographyHPCController):
         config: Config832
     ) -> None:
         super().__init__(config)
+        # Load allocation root from the Prefect JSON block
+        # The block must be registered with the name "alcf-allocation-root-path"
+        allocation_data = JSON.load("alcf-allocation-root-path").value
+        self.allocation_root = allocation_data.get("alcf-allocation-root-path")
+        if not self.allocation_root:
+            raise ValueError("Allocation root not found in JSON block 'alcf-allocation-root-path'")
+        logger.info(f"Allocation root loaded: {self.allocation_root}")
 
     def reconstruct(
         self,
@@ -51,8 +58,8 @@ class ALCFTomographyHPCController(TomographyHPCController):
         file_name = Path(file_path).stem + ".h5"
         folder_name = Path(file_path).parent.name
 
-        iri_als_bl832_rundir = "/eagle/IRI-ALS-832/data/raw"
-        iri_als_bl832_recon_script = "/eagle/IRI-ALS-832/scripts/globus_reconstruction.py"
+        iri_als_bl832_rundir = f"{self.allocation_root}/data/raw"
+        iri_als_bl832_recon_script = f"{self.allocation_root}/scripts/globus_reconstruction.py"
 
         gcc = Client(code_serialization_strategy=CombinedCode())
 
@@ -70,8 +77,8 @@ class ALCFTomographyHPCController(TomographyHPCController):
 
     @staticmethod
     def _reconstruct_wrapper(
-        rundir: str = "/eagle/IRI-ALS-832/data/raw",
-        script_path: str = "/eagle/IRI-ALS-832/scripts/globus_reconstruction.py",
+        rundir: str = "/eagle/IRIProd/ALS/data/raw",
+        script_path: str = "/eagle/IRIProd/ALS/scripts/globus_reconstruction.py",
         h5_file_name: str = None,
         folder_path: str = None
     ) -> str:
@@ -125,11 +132,11 @@ class ALCFTomographyHPCController(TomographyHPCController):
         file_name = Path(file_path).stem
         folder_name = Path(file_path).parent.name
 
-        tiff_scratch_path = f"/eagle/IRI-ALS-832/data/scratch/{folder_name}/rec{file_name}/"
-        raw_path = f"/eagle/IRI-ALS-832/data/raw/{folder_name}/{file_name}.h5"
+        tiff_scratch_path = f"{self.allocation_root}/data/scratch/{folder_name}/rec{file_name}/"
+        raw_path = f"{self.allocation_root}/raw/{folder_name}/{file_name}.h5"
 
-        iri_als_bl832_rundir = "/eagle/IRI-ALS-832/data/raw"
-        iri_als_bl832_conversion_script = "/eagle/IRI-ALS-832/scripts/tiff_to_zarr.py"
+        iri_als_bl832_rundir = f"{self.allocation_root}/data/raw"
+        iri_als_bl832_conversion_script = f"{self.allocation_root}/scripts/tiff_to_zarr.py"
 
         gcc = Client(code_serialization_strategy=CombinedCode())
 
@@ -147,8 +154,8 @@ class ALCFTomographyHPCController(TomographyHPCController):
 
     @staticmethod
     def _build_multi_resolution_wrapper(
-        rundir: str = "/eagle/IRI-ALS-832/data/raw",
-        script_path: str = "/eagle/IRI-ALS-832/scripts/tiff_to_zarr.py",
+        rundir: str = "/eagle/IRIProd/ALS/data/raw",
+        script_path: str = "/eagle/IRIProd/ALS/scripts/tiff_to_zarr.py",
         recon_path: str = None,
         raw_path: str = None
     ) -> str:
@@ -461,7 +468,7 @@ def alcf_recon_flow(
 
 if __name__ == "__main__":
     folder_name = 'dabramov'
-    file_name = '20240425_104614_nist-sand-30-100_27keV_z8mm_n2625'
+    file_name = '20230606_151124_jong-seto_fungal-mycelia_roll-AQ_fungi1_fast'
     flow_success = alcf_recon_flow(
         file_path=f"/{folder_name}/{file_name}.h5",
         config=Config832()
