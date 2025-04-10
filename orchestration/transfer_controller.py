@@ -10,8 +10,9 @@ from typing import Generic, TypeVar, Optional
 import globus_sdk
 
 from orchestration.flows.bl832.config import Config832
+from orchestration.flows.bl832.job_controller import HPC
 from orchestration.globus.transfer import GlobusEndpoint, start_transfer
-from orchestration.prometheus_utils import push_metrics_to_prometheus
+from orchestration.prometheus_utils import PrometheusMetrics
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -98,7 +99,7 @@ class TransferController(Generic[Endpoint], ABC):
         source: Endpoint = None,
         destination: Endpoint = None,
         collect_metrics: bool = True,
-        machine_name: str = "default"
+        machine_name: str = "NERSC"
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint.
@@ -128,6 +129,8 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         config: Config832
     ) -> None:
         super().__init__(config)
+        # Create metrics instance once per controller instance
+        self.prometheus_metrics = PrometheusMetrics()
         
     def get_file_size(
         self,
@@ -159,80 +162,35 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             globus_path = self._get_full_globus_path(path, endpoint)
             
             # Try to get item details - first see if it's a file or directory
-            try:
-                # First try direct stat if endpoint supports it
-                item_info = transfer_client.operation_stat(endpoint.uuid, path=globus_path)
-                is_dir = item_info['type'] == 'dir'
-            except (globus_sdk.GlobusAPIError, KeyError):
-                # Fallback: check parent directory listing
-                parent_dir = os.path.dirname(path)
-                basename = os.path.basename(path)
-                
-                # Handle case when path is root
-                if not parent_dir and not basename:
-                    is_dir = True
-                else:
-                    # Try to list parent directory
-                    parent_globus_path = self._get_full_globus_path(parent_dir, endpoint)
-                    try:
-                        parent_listing = transfer_client.operation_ls(endpoint.uuid, path=parent_globus_path)
-                        # Find our item
-                        item = next((i for i in parent_listing if i['name'] == basename), None)
-                        if not item:
-                            logger.warning(f"Path '{basename}' not found in directory '{parent_globus_path}'")
-                            return 0
-                        is_dir = item['type'] == 'dir'
-                    except globus_sdk.GlobusAPIError:
-                        # If we can't list parent, try direct listing - if it works, it's a directory
-                        try:
-                            transfer_client.operation_ls(endpoint.uuid, path=globus_path)
-                            is_dir = True
-                        except globus_sdk.GlobusAPIError:
-                            logger.error(f"Could not determine if {path} is file or directory")
-                            return 0
-            
+            item_info = transfer_client.operation_stat(endpoint.uuid, path=globus_path)
+            is_dir = item_info['type'] == 'dir'
+
             # Calculate size based on type
             if not is_dir:
                 # It's a file, get its size
-                try:
-                    item_info = transfer_client.operation_stat(endpoint.uuid, path=globus_path)
-                    return item_info.get('size', 0)
-                except globus_sdk.GlobusAPIError:
-                    try:
-                        # Try listing parent directory as fallback
-                        parent_dir = os.path.dirname(path)
-                        basename = os.path.basename(path)
-                        parent_globus_path = self._get_full_globus_path(parent_dir, endpoint)
-                        
-                        parent_listing = transfer_client.operation_ls(endpoint.uuid, path=parent_globus_path)
-                        item = next((i for i in parent_listing if i['name'] == basename), None)
-                        return item.get('size', 0) if item else 0
-                    except:
-                        logger.error(f"Failed to get file size for {path}")
-                        return 0
+                item_info = transfer_client.operation_stat(endpoint.uuid, path=globus_path)
+                return item_info.get('size', 0)
+
             else:
                 # It's a directory, calculate total size
                 total_size = 0
                 
-                try:
-                    # List directory contents
-                    dir_listing = transfer_client.operation_ls(endpoint.uuid, path=globus_path)
-                    
-                    # Process all items
-                    for item in dir_listing:
-                        if item['type'] == 'file':
-                            total_size += item.get('size', 0)
-                        elif item['type'] == 'dir' and recursive:
-                            # Recursively get subdirectory size
-                            subdir_path = os.path.join(path, item['name'])
-                            total_size += self.get_file_size(
-                                subdir_path, endpoint, transfer_client, recursive
-                            )
-                    
-                    return total_size
-                except globus_sdk.GlobusAPIError as e:
-                    logger.error(f"Failed to list directory {path}: {e}")
-                    return 0
+                # List directory contents
+                dir_listing = transfer_client.operation_ls(endpoint.uuid, path=globus_path)
+                
+                # Process all items
+                for item in dir_listing:
+                    if item['type'] == 'file':
+                        total_size += item.get('size', 0)
+                    elif item['type'] == 'dir' and recursive:
+                        # Recursively get subdirectory size
+                        subdir_path = os.path.join(path, item['name'])
+                        total_size += self.get_file_size(
+                            subdir_path, endpoint, transfer_client, recursive
+                        )
+                
+                return total_size
+
                 
         except Exception as e:
             logger.error(f"Error getting path size: {e}")
@@ -298,7 +256,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             }
             
             # Push metrics to Prometheus
-            push_metrics_to_prometheus(metrics, logger)
+            self.prometheus_metrics.push_metrics_to_prometheus(metrics, logger)
             
         except Exception as e:
             logger.error(f"Error collecting or pushing metrics: {e}")
@@ -309,7 +267,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         source: GlobusEndpoint = None,
         destination: GlobusEndpoint = None,
         collect_metrics: bool = True,
-        machine_name: str = "nersc"
+        machine_name: str = "NERSC"
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint.
@@ -319,11 +277,18 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             source (GlobusEndpoint): The source endpoint.
             destination (GlobusEndpoint): The destination endpoint.
             collect_metrics (bool): Whether to collect and push metrics to Prometheus.
-            machine_name (str): The name of the machine for metrics labeling.
+            machine_name (str): The name of the machine for metrics labeling. Must be one of the HPC enum values: NERSC, ALCF, or OLCF.
             
         Returns:
             bool: True if the transfer was successful, False otherwise.
         """
+        # Validate machine_name is a valid HPC value
+        valid_hpc_values = [hpc.value for hpc in HPC]
+        if machine_name not in valid_hpc_values:
+            valid_values_str = ", ".join(valid_hpc_values)
+            logger.error(f"Invalid machine_name: {machine_name}. Must be one of: {valid_values_str}")
+            return False
+        
         if not file_path:
             logger.error("No file_path provided")
             return False
@@ -416,7 +381,7 @@ class SimpleTransferController(TransferController[FileSystemEndpoint]):
         source: FileSystemEndpoint = None,
         destination: FileSystemEndpoint = None,
         collect_metrics: bool = False,
-        machine_name: str = "local"
+        machine_name: str = "NERSC"
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint using the 'cp' command.

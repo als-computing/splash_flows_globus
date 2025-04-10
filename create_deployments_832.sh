@@ -9,6 +9,11 @@ prefect work-pool create 'scicat_ingest_pool'
 # new_file_832_flow_pool
     # in docker-compose.yaml:
     # command: prefect agent start --pool "new_file_832_flow_pool"
+    
+# file transfer from data832 to nersc832 with Grafana Monitoring enabled
+prefect deployment build ./orchestration/flows/bl832/move.py:test_transfers_832_grafana -n test_transfers_832_grafana -p new_file_832_flow_pool -q test_transfers_832_queue
+prefect deployment apply test_transfers_832_grafana-deployment.yaml
+
 prefect deployment build ./orchestration/flows/bl832/move.py:process_new_832_file -n new_file_832 -p new_file_832_flow_pool -q new_file_832_queue
 prefect deployment apply process_new_832_file-deployment.yaml
 

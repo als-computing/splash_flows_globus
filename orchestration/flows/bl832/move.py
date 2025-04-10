@@ -44,38 +44,8 @@ def transfer_spot_to_data(
     logger.info(f"spot832 to data832 globus task_id: {task}")
     return success
 
-
 @task(name="transfer_data_to_nersc")
 def transfer_data_to_nersc(
-    file_path: str,
-    transfer_client: TransferClient,
-    data832: GlobusEndpoint,
-    nersc832: GlobusEndpoint,
-):
-    logger = get_run_logger()
-
-    # if source_file begins with "/", it will mess up os.path.join
-    if file_path[0] == "/":
-        file_path = file_path[1:]
-    source_path = os.path.join(data832.root_path, file_path)
-    dest_path = os.path.join(nersc832.root_path, file_path)
-
-    logger.info(f"Transferring {dest_path} data832 to nersc")
-
-    success = start_transfer(
-        transfer_client,
-        data832,
-        source_path,
-        nersc832,
-        dest_path,
-        max_wait_seconds=600,
-        logger=logger,
-    )
-
-    return success
-
-@task(name="transfer_data_to_nersc")
-def transfer_data_to_ners_by_controller(
     file_path: str,
     transfer_client: TransferClient,
     data832: GlobusEndpoint,
@@ -107,7 +77,7 @@ def transfer_data_to_ners_by_controller(
         source=data832,
         destination=nersc832,
         collect_metrics=True,
-        machine_name="nersc"
+        machine_name="NERSC"
     )
 
     return success
@@ -232,13 +202,11 @@ def test_transfers_832(file_path: str = "/raw/transfer_tests/test.txt"):
 
 
 @flow(name="test_832_transfers_grafana")
-def test_transfers_832_grafana(file_path: str = "/raw/transfer_tests/test_xchong/"):
+def test_transfers_832_grafana(file_path: str = "/raw/transfer_tests/test/test2"):
     logger = get_run_logger()
     config = Config832()
 
-    logger.info(f"{str(uuid.uuid4())}{file_path}")
-
-    task = transfer_data_to_ners_by_controller(file_path, config.tc, config.data832, config.nersc_alsdev)
+    task = transfer_data_to_nersc(file_path, config.tc, config.data832, config.nersc_alsdev)
 
     logger.info(
         f"File successfully transferred from data832 to NERSC {file_path}. Task {task}"
