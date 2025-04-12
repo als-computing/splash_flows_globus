@@ -284,6 +284,8 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         # Start the timer
         transfer_start_time = time.time()
         success = False
+        task_id = None  # Initialize task_id here to prevent UnboundLocalError
+        file_size = 0   # Initialize file_size here as well
         
         try:
             success, task_id = start_transfer(
@@ -311,7 +313,6 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             elapsed_time = transfer_end_time - transfer_start_time
 
             # Try to get transfer info from the completed task
-            file_size = 0
             if task_id:
                 transfer_info = self.get_transfer_file_info(task_id)
                 if transfer_info:
@@ -425,7 +426,7 @@ def get_transfer_controller(
         TransferController: The transfer controller object.
     """
     if transfer_type == CopyMethod.GLOBUS:
-        return GlobusTransferController(config,prometheus_metrics)
+        return GlobusTransferController(config, prometheus_metrics)
     elif transfer_type == CopyMethod.SIMPLE:
         return SimpleTransferController(config)
     else:
