@@ -97,7 +97,7 @@ class TransferController(Generic[Endpoint], ABC):
         self,
         file_path: str = None,
         source: Endpoint = None,
-        destination: Endpoint = None
+        destination: Endpoint = None,
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint.
@@ -106,8 +106,6 @@ class TransferController(Generic[Endpoint], ABC):
             file_path (str): The path of the file to copy.
             source (Endpoint): The source endpoint.
             destination (Endpoint): The destination endpoint.
-            collect_metrics (bool): Whether to collect and push metrics to Prometheus.
-            machine_name (str): The name of the machine for metrics labeling.
 
         Returns:
             bool: True if the transfer was successful, False otherwise.
@@ -251,7 +249,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         self,
         file_path: str = None,
         source: GlobusEndpoint = None,
-        destination: GlobusEndpoint = None
+        destination: GlobusEndpoint = None,
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint.
@@ -260,9 +258,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             file_path (str): The path of the file to copy.
             source (GlobusEndpoint): The source endpoint.
             destination (GlobusEndpoint): The destination endpoint.
-            collect_metrics (bool): Whether to collect and push metrics to Prometheus.
-            machine_name (str): The name of the machine for metrics labeling. Must be one of the HPC enum values: NERSC, ALCF, or OLCF.
-            
+
         Returns:
             bool: True if the transfer was successful, False otherwise.
         """
@@ -355,7 +351,7 @@ class SimpleTransferController(TransferController[FileSystemEndpoint]):
         self,
         file_path: str = "",
         source: FileSystemEndpoint = None,
-        destination: FileSystemEndpoint = None
+        destination: FileSystemEndpoint = None,
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint using the 'cp' command.
@@ -364,8 +360,6 @@ class SimpleTransferController(TransferController[FileSystemEndpoint]):
             file_path (str): The path of the file to copy.
             source (FileSystemEndpoint): The source endpoint.
             destination (FileSystemEndpoint): The destination endpoint.
-            collect_metrics (bool): Whether to collect and push metrics to Prometheus.
-            machine_name (str): The name of the machine for metrics labeling.
 
         Returns:
             bool: True if the transfer was successful, False otherwise.
