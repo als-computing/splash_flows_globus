@@ -11,6 +11,7 @@ from orchestration.flows.scicat.ingest import ingest_dataset
 from orchestration.flows.bl832.config import Config832
 from orchestration.globus.transfer import GlobusEndpoint, start_transfer
 from orchestration.prefect import schedule_prefect_flow
+from orchestration.prometheus_utils import PrometheusMetrics
 
 
 API_KEY = os.getenv("API_KEY")
@@ -63,10 +64,14 @@ def transfer_data_to_nersc(
     # Import here to avoid circular imports
     from orchestration.transfer_controller import get_transfer_controller, CopyMethod
     
+    # Change prometheus_metrics=None if do not want to push metrics
+    # prometheus_metrics = None
+    prometheus_metrics = PrometheusMetrics() 
     # Get a Globus transfer controller
     transfer_controller = get_transfer_controller(
         transfer_type=CopyMethod.GLOBUS,
-        config=config
+        config=config,
+        prometheus_metrics=prometheus_metrics
     )
     
     # Use transfer controller to copy the file
@@ -75,9 +80,7 @@ def transfer_data_to_nersc(
     success = transfer_controller.copy(
         file_path=file_path,
         source=data832,
-        destination=nersc832,
-        collect_metrics=True,
-        machine_name="NERSC"
+        destination=nersc832
     )
 
     return success

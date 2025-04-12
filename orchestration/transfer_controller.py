@@ -97,9 +97,7 @@ class TransferController(Generic[Endpoint], ABC):
         self,
         file_path: str = None,
         source: Endpoint = None,
-        destination: Endpoint = None,
-        collect_metrics: bool = True,
-        machine_name: str = "NERSC"
+        destination: Endpoint = None
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint.
@@ -126,118 +124,78 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
     """
     def __init__(
         self,
-        config: Config832
+        config: Config832,
+        prometheus_metrics: Optional[PrometheusMetrics] = None
     ) -> None:
         super().__init__(config)
-        # Create metrics instance once per controller instance
-        self.prometheus_metrics = PrometheusMetrics()
-        
-    def get_file_size(
+        self.prometheus_metrics = prometheus_metrics
+
+    def get_transfer_file_info(
         self,
-        path: str,
-        endpoint: GlobusEndpoint,
-        transfer_client: Optional[globus_sdk.TransferClient] = None,
-        recursive: bool = True
-    ) -> int:
+        task_id: str,
+        transfer_client: Optional[globus_sdk.TransferClient] = None
+    ) -> Optional[dict]:
         """
-        Get the size of a file or directory on a Globus endpoint.
+        Get information about a completed transfer from the Globus API.
         
         Args:
-            path (str): Path to file or directory on the endpoint
-            endpoint (GlobusEndpoint): The Globus endpoint
+            task_id (str): The Globus transfer task ID
             transfer_client (TransferClient, optional): TransferClient instance
-            recursive (bool): Include subdirectories in size calculation
-        
+            
         Returns:
-            int: Size in bytes (0 if error)
+            Optional[dict]: Task information including bytes_transferred, or None if unavailable
         """
         if transfer_client is None:
             transfer_client = self.config.tc
             
         try:
-            # Normalize path
-            path = path[1:] if path.startswith('/') else path
+            task_info = transfer_client.get_task(task_id)
+            task_dict = task_info.data
+            if task_dict.get('status') == 'SUCCEEDED':
+                return {
+                    'bytes_transferred': task_dict.get('bytes_checksummed', 0)
+                }
+                
+            return None
             
-            # Get the full Globus path
-            globus_path = self._get_full_globus_path(path, endpoint)
-            
-            # Try to get item details - first see if it's a file or directory
-            item_info = transfer_client.operation_stat(endpoint.uuid, path=globus_path)
-            is_dir = item_info['type'] == 'dir'
-
-            # Calculate size based on type
-            if not is_dir:
-                # It's a file, get its size
-                item_info = transfer_client.operation_stat(endpoint.uuid, path=globus_path)
-                return item_info.get('size', 0)
-
-            else:
-                # It's a directory, calculate total size
-                total_size = 0
-                
-                # List directory contents
-                dir_listing = transfer_client.operation_ls(endpoint.uuid, path=globus_path)
-                
-                # Process all items
-                for item in dir_listing:
-                    if item['type'] == 'file':
-                        total_size += item.get('size', 0)
-                    elif item['type'] == 'dir' and recursive:
-                        # Recursively get subdirectory size
-                        subdir_path = os.path.join(path, item['name'])
-                        total_size += self.get_file_size(
-                            subdir_path, endpoint, transfer_client, recursive
-                        )
-                
-                return total_size
-
-                
         except Exception as e:
-            logger.error(f"Error getting path size: {e}")
-            return 0
-            
-    def _get_full_globus_path(self, path: str, endpoint: GlobusEndpoint) -> str:
-        """Helper to get full path on Globus endpoint"""
-        if hasattr(endpoint, 'full_path'):
-            return endpoint.full_path(path)
-        elif hasattr(endpoint, 'root_path'):
-            # Manually construct path with root_path
-            if endpoint.root_path.endswith('/') and path.startswith('/'):
-                path = path[1:]
-            return os.path.join(endpoint.root_path, path)
-        return path
+            logger.error(f"Error getting transfer task info: {e}")
+            return None
     
     def collect_and_push_metrics(
         self,
-        start_time: datetime.datetime,
-        end_time: datetime.datetime,
+        start_time: float,
+        end_time: float,
         file_path: str,
         source: GlobusEndpoint,
         destination: GlobusEndpoint,
         file_size: int,
-        success: bool,
-        machine_name: str
+        success: bool
     ) -> None:
         """
         Collect transfer metrics and push them to Prometheus.
         
         Args:
-            start_time (datetime.datetime): Transfer start time.
-            end_time (datetime.datetime): Transfer end time.
+            start_time (float): Transfer start time as UNIX timestamp.
+            end_time (float): Transfer end time as UNIX timestamp.
             file_path (str): The path of the transferred file.
             source (GlobusEndpoint): The source endpoint.
             destination (GlobusEndpoint): The destination endpoint.
             file_size (int): Size of the transferred file in bytes.
             success (bool): Whether the transfer was successful.
-            machine_name (str): Name of the machine for metrics labeling.
         """
         try:
-            # Convert datetime objects to ISO format strings
-            start_timestamp = start_time.isoformat()
-            end_timestamp = end_time.isoformat()
+            # Get machine_name
+            machine_name = self._get_hpc_name_from_endpoint(destination)
+
+            # Convert UNIX timestamps to ISO format strings
+            start_datetime = datetime.datetime.fromtimestamp(start_time, tz=datetime.timezone.utc)
+            end_datetime = datetime.datetime.fromtimestamp(end_time, tz=datetime.timezone.utc)
+            start_timestamp = start_datetime.isoformat()
+            end_timestamp = end_datetime.isoformat()
             
             # Calculate duration in seconds
-            duration_seconds = (end_time - start_time).total_seconds()
+            duration_seconds = end_time - start_time
             
             # Calculate transfer speed (bytes per second)
             transfer_speed = file_size / duration_seconds if duration_seconds > 0 and file_size > 0 else 0
@@ -261,13 +219,39 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         except Exception as e:
             logger.error(f"Error collecting or pushing metrics: {e}")
 
+    def _get_hpc_name_from_endpoint(self, endpoint: GlobusEndpoint) -> str:
+        """
+        Determine HPC system name from endpoint information.
+        
+        Args:
+            endpoint (GlobusEndpoint): The endpoint to analyze
+            
+        Returns:
+            str: HPC system name like 'NERSC', 'ALCF', etc.
+        """
+        # Look at endpoint name or URI
+        endpoint_identifiers = [
+            endpoint.name.lower() if endpoint.name else "",
+            endpoint.uri.lower() if endpoint.uri else "",
+        ]
+        
+        # Map endpoint identifiers to HPC names
+        for identifier in endpoint_identifiers:
+            if "nersc" in identifier:
+                return HPC.NERSC.value
+            elif "alcf" in identifier:
+                return HPC.ALCF.value
+            elif "olcf" in identifier:
+                return HPC.OLCF.value
+                
+        # Default to NERSC if we can't determine
+        return HPC.NERSC.value
+    
     def copy(
         self,
         file_path: str = None,
         source: GlobusEndpoint = None,
-        destination: GlobusEndpoint = None,
-        collect_metrics: bool = True,
-        machine_name: str = "NERSC"
+        destination: GlobusEndpoint = None
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint.
@@ -282,12 +266,6 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         Returns:
             bool: True if the transfer was successful, False otherwise.
         """
-        # Validate machine_name is a valid HPC value
-        valid_hpc_values = [hpc.value for hpc in HPC]
-        if machine_name not in valid_hpc_values:
-            valid_values_str = ", ".join(valid_hpc_values)
-            logger.error(f"Invalid machine_name: {machine_name}. Must be one of: {valid_values_str}")
-            return False
         
         if not file_path:
             logger.error("No file_path provided")
@@ -303,15 +281,6 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         if file_path[0] == "/":
             file_path = file_path[1:]
 
-        # Record start time for metrics if collecting metrics
-        start_time = datetime.datetime.now()
-        
-        # Get file size before transfer if collecting metrics
-        file_size = 0
-        if collect_metrics:
-            file_size = self.get_file_size(file_path, source)
-            logger.info(f"File size: {file_size} bytes")
-
         source_path = os.path.join(source.root_path, file_path)
         dest_path = os.path.join(destination.root_path, file_path)
         logger.info(f"Transferring {source_path} to {dest_path}")
@@ -321,7 +290,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         success = False
         
         try:
-            success = start_transfer(
+            success, task_id = start_transfer(
                 transfer_client=self.config.tc,
                 source_endpoint=source,
                 source_path=source_path,
@@ -329,8 +298,9 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
                 dest_path=dest_path,
                 max_wait_seconds=600,
                 logger=logger,
+                return_task_id=True,  # Add this parameter to get the task_id
             )
-            
+
             if success:
                 logger.info("Transfer completed successfully.")
             else:
@@ -343,23 +313,29 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             # Stop the timer and calculate the duration
             transfer_end_time = time.time()
             elapsed_time = transfer_end_time - transfer_start_time
+
+            # Try to get transfer info from the completed task
+            file_size = 0
+            if task_id:
+                transfer_info = self.get_transfer_file_info(task_id)
+                if transfer_info:
+                    file_size = transfer_info.get('bytes_transferred', 0)
+                    logger.info(f"Transferred {file_size} bytes ")
             transfer_rate = file_size / elapsed_time if elapsed_time > 0 and file_size > 0 else 0
             
             logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
             logger.info(f"Transfer rate: {transfer_rate:.2f} bytes/second")
             
             # Collect and push metrics if enabled
-            if collect_metrics:
-                end_time = datetime.datetime.now()
+            if self.prometheus_metrics:
                 self.collect_and_push_metrics(
-                    start_time=start_time,
-                    end_time=end_time,
+                    start_time=transfer_start_time,
+                    end_time=transfer_end_time,
                     file_path=file_path,
                     source=source,
                     destination=destination,
                     file_size=file_size,
                     success=success,
-                    machine_name=machine_name
                 )
                 
             return success
@@ -379,9 +355,7 @@ class SimpleTransferController(TransferController[FileSystemEndpoint]):
         self,
         file_path: str = "",
         source: FileSystemEndpoint = None,
-        destination: FileSystemEndpoint = None,
-        collect_metrics: bool = False,
-        machine_name: str = "NERSC"
+        destination: FileSystemEndpoint = None
     ) -> bool:
         """
         Copy a file from a source endpoint to a destination endpoint using the 'cp' command.
@@ -443,7 +417,8 @@ class CopyMethod(Enum):
 
 def get_transfer_controller(
     transfer_type: CopyMethod,
-    config: Config832
+    config: Config832,
+    prometheus_metrics: Optional[PrometheusMetrics] = None
 ) -> TransferController:
     """
     Get the appropriate transfer controller based on the transfer type.
@@ -456,7 +431,7 @@ def get_transfer_controller(
         TransferController: The transfer controller object.
     """
     if transfer_type == CopyMethod.GLOBUS:
-        return GlobusTransferController(config)
+        return GlobusTransferController(config,prometheus_metrics)
     elif transfer_type == CopyMethod.SIMPLE:
         return SimpleTransferController(config)
     else:
