@@ -149,9 +149,17 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         try:
             task_info = transfer_client.get_task(task_id)
             task_dict = task_info.data
+
             if task_dict.get('status') == 'SUCCEEDED':
+                bytes_transferred = task_dict.get('bytes_transferred', 0) 
+                bytes_checksummed = task_dict.get('bytes_checksummed', 0)
+                files_transferred = task_dict.get('files_transferred', 0)
+                effective_bytes_per_second = task_dict.get('effective_bytes_per_second', 0)
                 return {
-                    'bytes_transferred': task_dict.get('bytes_checksummed', 0)
+                    'bytes_transferred': bytes_transferred,
+                    'bytes_checksummed': bytes_checksummed,
+                    'files_transferred': files_transferred,
+                    'effective_bytes_per_second': effective_bytes_per_second
                 }
                 
             return None
@@ -168,6 +176,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         source: GlobusEndpoint,
         destination: GlobusEndpoint,
         file_size: int,
+        transfer_speed: float,
         success: bool
     ) -> None:
         """
@@ -180,6 +189,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             source (GlobusEndpoint): The source endpoint.
             destination (GlobusEndpoint): The destination endpoint.
             file_size (int): Size of the transferred file in bytes.
+            transfer_speed (float): Transfer speed (bytes/second) provided by Globus
             success (bool): Whether the transfer was successful.
         """
         try:
@@ -196,8 +206,8 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             duration_seconds = end_time - start_time
             
             # Calculate transfer speed (bytes per second)
-            transfer_speed = file_size / duration_seconds if duration_seconds > 0 and file_size > 0 else 0
-            
+            # transfer_speed = file_size / duration_seconds if duration_seconds > 0 and file_size > 0 else 0
+
             # Prepare metrics dictionary
             metrics = {
                 "timestamp": start_timestamp,
@@ -316,21 +326,18 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         finally:
             # Stop the timer and calculate the duration
             transfer_end_time = time.time()
-            elapsed_time = transfer_end_time - transfer_start_time
 
             # Try to get transfer info from the completed task
             if task_id:
                 transfer_info = self.get_transfer_file_info(task_id)
                 if transfer_info:
                     file_size = transfer_info.get('bytes_transferred', 0)
-                    logger.info(f"Transferred {file_size} bytes ")
-            transfer_rate = file_size / elapsed_time if elapsed_time > 0 and file_size > 0 else 0
-            
-            logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
-            logger.info(f"Transfer rate: {transfer_rate:.2f} bytes/second")
+                    transfer_speed = transfer_info.get('effective_bytes_per_second', 0)
+                    logger.info(f"Globus Task Info: Transferred {file_size} bytes ")
+                    logger.info(f"Globus Task Info: Effective speed: {transfer_speed} bytes/second")
             
             # Collect and push metrics if enabled
-            if self.prometheus_metrics:
+            if self.prometheus_metrics and file_size > 0:
                 self.collect_and_push_metrics(
                     start_time=transfer_start_time,
                     end_time=transfer_end_time,
@@ -338,6 +345,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
                     source=source,
                     destination=destination,
                     file_size=file_size,
+                    transfer_speed=transfer_speed,
                     success=success,
                 )
                 

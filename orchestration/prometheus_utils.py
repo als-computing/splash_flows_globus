@@ -58,8 +58,8 @@ class PrometheusMetrics():
             self.transfer_speed.labels(machine=metrics['machine']).set(metrics['transfer_speed'])
             
             # Log metrics for debugging
-            logger.info(f"Pushing metrics: bytes_transferred={metrics['bytes_transferred']}")
-            logger.info(f"Transfer speed: {metrics['transfer_speed']} bytes/second")
+            logger.info(f"Pushing metrics: transfer_bytes = {metrics['bytes_transferred']} bytes")
+            logger.info(f"Pushing metrics: transfer_speed = {metrics['transfer_speed']} bytes/second")
             
             # Push to Pushgateway with error handling
             try:
