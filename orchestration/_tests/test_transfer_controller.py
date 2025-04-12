@@ -12,6 +12,7 @@ from prefect.testing.utilities import prefect_test_harness
 from .test_globus import MockTransferClient
 
 
+
 @pytest.fixture(autouse=True, scope="session")
 def prefect_test_fixture():
     """
@@ -225,6 +226,50 @@ def test_globus_transfer_controller_copy_exception(
         assert result is False, "Expected False when TransferAPIError is raised."
         mock_start_transfer.assert_called_once()
 
+def test_globus_transfer_controller_with_metrics(
+    mock_config832, mock_globus_endpoint, transfer_controller_module
+):
+    """
+    Test GlobusTransferController with PrometheusMetrics integration.
+    """
+    GlobusTransferController = transfer_controller_module["GlobusTransferController"]
+    from orchestration.prometheus_utils import PrometheusMetrics
+    mock_prometheus = MagicMock(spec=PrometheusMetrics)
+    
+    with patch("orchestration.transfer_controller.start_transfer", return_value=(True, "mock-task-id")) as mock_start_transfer:
+        # Create the controller with mock prometheus metrics
+        controller = GlobusTransferController(mock_config832, prometheus_metrics=mock_prometheus)
+        
+        # Set up mock for get_transfer_file_info
+        mock_transfer_info = {"bytes_transferred": 1024 * 1024}  # 1MB
+        controller.get_transfer_file_info = MagicMock(return_value=mock_transfer_info)
+        
+        # Execute the copy operation
+        result = controller.copy(
+            file_path="some_dir/test_file.txt",
+            source=mock_globus_endpoint,
+            destination=mock_globus_endpoint,
+        )
+        
+        # Verify transfer was successful
+        assert result is True
+        mock_start_transfer.assert_called_once()
+        
+        # Verify metrics were collected and pushed
+        controller.get_transfer_file_info.assert_called_once_with("mock-task-id")
+        mock_prometheus.push_metrics_to_prometheus.assert_called_once()
+        
+        # Verify the metrics data
+        metrics_data = mock_prometheus.push_metrics_to_prometheus.call_args[0][0]
+        assert metrics_data["bytes_transferred"] == 1024 * 1024
+        assert metrics_data["status"] == "success"
+        assert "timestamp" in metrics_data
+        assert "end_timestamp" in metrics_data
+        assert "duration_seconds" in metrics_data
+        assert "transfer_speed" in metrics_data
+        assert "machine" in metrics_data
+        assert "local_path" in metrics_data
+        assert "remote_path" in metrics_data
 
 # --------------------------------------------------------------------------
 # Tests for SimpleTransferController

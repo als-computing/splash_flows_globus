@@ -1,5 +1,4 @@
 import os
-import time
 import uuid
 from prometheus_client import Gauge, CollectorRegistry, push_to_gateway
 
