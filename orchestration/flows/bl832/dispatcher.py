@@ -14,7 +14,6 @@ class FlowParameterMapper:
         # From alcf.py
         "alcf_recon_flow/alcf_recon_flow": [
             "file_path",
-            "is_export_control",
             "config"],
         # From move.py
         "new_832_file_flow/new_file_832": [
@@ -24,8 +23,7 @@ class FlowParameterMapper:
         # From nersc.py
         "nersc_recon_flow/nersc_recon_flow": [
             "file_path",
-            "is_export_control",
-            "config"]  # Placeholder parameters for NERSC reconstruction
+            "config"]
     }
 
     @classmethod
