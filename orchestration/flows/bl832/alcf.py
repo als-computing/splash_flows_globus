@@ -3,6 +3,7 @@ import datetime
 import logging
 from pathlib import Path
 import time
+from typing import Optional
 
 from globus_compute_sdk import Client, Executor
 from globus_compute_sdk.serialize import CombinedCode
@@ -349,7 +350,7 @@ def schedule_pruning(
 @flow(name="alcf_recon_flow")
 def alcf_recon_flow(
     file_path: str,
-    config: Config832,
+    config: Optional[Config832] = None,
 ) -> bool:
     """
     Process and transfer a file from a source to the ALCF.
@@ -362,6 +363,8 @@ def alcf_recon_flow(
         bool: True if the flow completed successfully, False otherwise.
     """
 
+    if config is None:
+        config = Config832()
     # set up file paths
     path = Path(file_path)
     folder_name = path.parent.name

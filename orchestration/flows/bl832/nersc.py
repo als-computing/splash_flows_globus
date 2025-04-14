@@ -432,8 +432,8 @@ def nersc_recon_flow(
     :param file_path: Path to the file to reconstruct.
     """
     if config is None:
-        from orchestration.flows.bl832.config import Config832
         config = Config832()
+
     logger.info(f"Starting NERSC reconstruction flow for {file_path=}")
     controller = get_controller(
         hpc_type=HPC.NERSC,
