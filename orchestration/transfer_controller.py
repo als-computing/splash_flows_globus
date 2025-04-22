@@ -194,7 +194,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         """
         try:
             # Get machine_name
-            machine_name = self._get_hpc_name_from_endpoint(destination)
+            machine_name = destination.name
 
             # Convert UNIX timestamps to ISO format strings
             start_datetime = datetime.datetime.fromtimestamp(start_time, tz=datetime.timezone.utc)
@@ -226,34 +226,6 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             
         except Exception as e:
             logger.error(f"Error collecting or pushing metrics: {e}")
-
-    def _get_hpc_name_from_endpoint(self, endpoint: GlobusEndpoint) -> str:
-        """
-        Determine HPC system name from endpoint information.
-        
-        Args:
-            endpoint (GlobusEndpoint): The endpoint to analyze
-            
-        Returns:
-            str: HPC system name like 'NERSC', 'ALCF', etc.
-        """
-        # Look at endpoint name or URI
-        endpoint_identifiers = [
-            endpoint.name.lower() if endpoint.name else "",
-            endpoint.uri.lower() if endpoint.uri else "",
-        ]
-        
-        # Map endpoint identifiers to HPC names
-        for identifier in endpoint_identifiers:
-            if "nersc" in identifier:
-                return HPC.NERSC.value
-            elif "alcf" in identifier:
-                return HPC.ALCF.value
-            elif "olcf" in identifier:
-                return HPC.OLCF.value
-                
-        # Default to NERSC if we can't determine
-        return HPC.NERSC.value
     
     def copy(
         self,
