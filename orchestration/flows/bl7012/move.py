@@ -38,7 +38,7 @@ def transfer_data_to_nersc(
         f"Transferring {source_path} {source_endpoint.name} to {destination_endpoint.name}"
     )
 
-    success = start_transfer(
+    success, _ = start_transfer(
         transfer_client,
         source_endpoint,
         source_path,
@@ -76,7 +76,7 @@ def transfer_data_within_single_endpoint(
 
     # Start globus transfer
     logger.info(f"Transferring {source_path} to {dest_path} at {globus_endpoint.name}")
-    success = start_transfer(
+    success, _ = start_transfer(
         transfer_client,
         globus_endpoint,
         source_path,

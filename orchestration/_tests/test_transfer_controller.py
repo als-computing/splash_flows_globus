@@ -161,7 +161,7 @@ def test_globus_transfer_controller_copy_success(
     # Patch any Secret.load calls to avoid real Prefect Cloud calls
     mocker.patch('prefect.blocks.system.Secret.load', return_value=MockSecretClass())
 
-    with patch("orchestration.transfer_controller.start_transfer", return_value=True) as mock_start_transfer:
+    with patch("orchestration.transfer_controller.start_transfer", return_value=(True, "mock-task-id")) as mock_start_transfer:
         controller = GlobusTransferController(mock_config832)
         result = controller.copy(
             file_path="some_dir/test_file.txt",
@@ -191,7 +191,7 @@ def test_globus_transfer_controller_copy_failure(
 
     mocker.patch('prefect.blocks.system.Secret.load', return_value=MockSecretClass())
 
-    with patch("orchestration.transfer_controller.start_transfer", return_value=False) as mock_start_transfer:
+    with patch("orchestration.transfer_controller.start_transfer", return_value=(False, "mock-task-id")) as mock_start_transfer:
         controller = GlobusTransferController(mock_config832)
         result = controller.copy(
             file_path="some_dir/test_file.txt",

@@ -106,7 +106,6 @@ def start_transfer(
     dest_path: str,
     max_wait_seconds=600,
     logger=logger,
-    return_task_id=False,
 ):
     source_path = Path(source_path)
     label = source_path.stem
@@ -138,10 +137,8 @@ def start_transfer(
         transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
     )
     
-    if return_task_id:
-        return success, task_id
-    else:
-        return success
+    return success, task_id
+
 
 
 def is_globus_file_older(file_obj, older_than_days):

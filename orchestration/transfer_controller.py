@@ -270,7 +270,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
         file_size = 0   # Initialize file_size here as well
         
         try:
-            result = start_transfer(
+            success, task_id = start_transfer(
                 transfer_client=self.config.tc,
                 source_endpoint=source,
                 source_path=source_path,
@@ -278,14 +278,7 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
                 dest_path=dest_path,
                 max_wait_seconds=600,
                 logger=logger,
-                return_task_id=True,
             )
-            
-            # Check if we received a tuple or just a boolean
-            if isinstance(result, tuple):
-                success, task_id = result
-            else:
-                success = result
 
             if success:
                 logger.info("Transfer completed successfully.")
