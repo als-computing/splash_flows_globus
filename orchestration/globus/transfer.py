@@ -16,7 +16,7 @@ from globus_sdk import (
     TransferData
 )
 from prefect import task, get_run_logger
-from prefect.blocks.system import Secret
+# from prefect.blocks.system import Secret
 from ..config import get_config
 
 load_dotenv()
@@ -86,11 +86,14 @@ def build_apps(config: Dict) -> Dict[str, GlobusEndpoint]:
 def init_transfer_client(app: GlobusApp) -> TransferClient:
     logger = get_run_logger()
     # Get the client id and secret from Prefect Secret Blocks
-    GLOBUS_CLIENT_ID = Secret.load("globus-client-id")
-    GLOBUS_CLIENT_SECRET = Secret.load("globus-client-secret")
+    GLOBUS_CLIENT_ID = os.getenv("GLOBUS_CLIENT_ID")
+    GLOBUS_CLIENT_SECRET = os.getenv("GLOBUS_CLIENT_SECRET")
+    # GLOBUS_CLIENT_ID = Secret.load("globus-client-id")
+    # GLOBUS_CLIENT_SECRET = Secret.load("globus-client-secret")
     logger.info(f"Globus client id: {GLOBUS_CLIENT_ID}")
     confidential_client = ConfidentialAppAuthClient(
-        client_id=GLOBUS_CLIENT_ID.get(), client_secret=GLOBUS_CLIENT_SECRET.get()
+        # client_id=GLOBUS_CLIENT_ID.get(), client_secret=GLOBUS_CLIENT_SECRET.get()
+        GLOBUS_CLIENT_ID, GLOBUS_CLIENT_SECRET
     )
     scopes = "urn:globus:auth:scope:transfer.api.globus.org:all"
     cc_authorizer = ClientCredentialsAuthorizer(confidential_client, scopes)
@@ -136,9 +139,8 @@ def start_transfer(
     success = task_wait(
         transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
     )
-    
-    return success, task_id
 
+    return success, task_id
 
 
 def is_globus_file_older(file_obj, older_than_days):
