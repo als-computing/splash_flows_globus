@@ -139,7 +139,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-chmod -R 2775 {pscratch_path}/8.3.2
+# chmod -R 2775 {pscratch_path}/8.3.2
+chmod 2775 {pscratch_path}/8.3.2/raw/{folder_name}
+chmod 2775 {pscratch_path}/8.3.2/scratch/{folder_name}
+chmod 664 {pscratch_path}/8.3.2/raw/{folder_name}/{file_name}
+
 
 echo "Verifying copied files..."
 ls -l {pscratch_path}/8.3.2/raw/{folder_name}/
@@ -431,7 +435,10 @@ def nersc_recon_flow(
 
     :param file_path: Path to the file to reconstruct.
     """
+    logger = get_run_logger()
+
     if config is None:
+        logger.info("Initializing Config")
         config = Config832()
 
     logger.info(f"Starting NERSC reconstruction flow for {file_path=}")
@@ -439,12 +446,16 @@ def nersc_recon_flow(
         hpc_type=HPC.NERSC,
         config=config
     )
+    logger.info("NERSC reconstruction controller initialized")
+
     nersc_reconstruction_success = controller.reconstruct(
         file_path=file_path,
     )
+    logger.info(f"NERSC reconstruction success: {nersc_reconstruction_success}")
     nersc_multi_res_success = controller.build_multi_resolution(
         file_path=file_path,
     )
+    logger.info(f"NERSC multi-resolution success: {nersc_multi_res_success}")
 
     path = Path(file_path)
     folder_name = path.parent.name
