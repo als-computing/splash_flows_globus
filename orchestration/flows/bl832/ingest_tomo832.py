@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 from typing import Any, Dict, List
 
 import h5py
@@ -305,6 +306,9 @@ def clean_email(email: any) -> str:
 
     # Remove surrounding whitespace
     cleaned = email.strip()
+
+    # Remove leading/trailing quotes, commas, and whitespace
+    cleaned = re.sub(r'^["\'\s,]+|["\'\s,]+$', '', email)
 
     # Fallback if the email is empty, equals "NONE", or lacks an "@" symbol
     if not cleaned or cleaned.upper() == "NONE" or "@" not in cleaned:
