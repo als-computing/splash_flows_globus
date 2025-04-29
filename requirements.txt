@@ -10,6 +10,7 @@ mkdocs-material
 mkdocs-mermaid2-plugin
 numpy==1.23.2
 pillow
+pytest_mock
 python-dotenv
 prefect==2.19.5
 prometheus_client==0.21.1
