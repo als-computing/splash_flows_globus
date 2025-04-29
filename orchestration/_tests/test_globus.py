@@ -68,7 +68,7 @@ def test_succeeded_transfer():
     source_endpoint = GlobusEndpoint("123", "source.magrathea.com", "/root")
     dest_endpoint = GlobusEndpoint("456", "dest.magrathea.com", "/root")
 
-    result = start_transfer(
+    result, _ = start_transfer(
         transfer_client, source_endpoint, "/42/mice.jpg", dest_endpoint, "/42/mice.jpg"
     )
 
@@ -80,7 +80,7 @@ def test_failed_transfer():
     source_endpoint = GlobusEndpoint("123", "source.magrathea.com", "/root")
     dest_endpoint = GlobusEndpoint("456", "dest.magrathea.com", "/root")
 
-    result = start_transfer(
+    result, _ = start_transfer(
         transfer_client, source_endpoint, "/42/mice.jpg", dest_endpoint, "/42/mice.jpg"
     )
 

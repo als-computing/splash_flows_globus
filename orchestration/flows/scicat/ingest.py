@@ -2,10 +2,11 @@ import importlib
 import os
 from typing import List
 
-from pyscicat.client import from_credentials
+from pyscicat.client import ScicatClient, from_credentials
 from prefect import flow, task, get_run_logger
 
 from orchestration.flows.scicat.utils import Issue
+
 
 @flow(name="scicat_dataset_ingest")
 def ingest_dataset(file_path: str, ingestor: str):
@@ -23,7 +24,7 @@ def ingest_dataset(file_path: str, ingestor: str):
 
 @task(name="ingest_scicat")
 def ingest_dataset_task(file_path: str, ingestor_module: str):
-    """ Ingest a file into SciCat. 
+    """ Ingest a file into SciCat.
 
     Parameters
     ----------
@@ -33,14 +34,14 @@ def ingest_dataset_task(file_path: str, ingestor_module: str):
         Thy python module that contains the ingest function, e.g. "foo.bar.ingestor"
     """
     logger = get_run_logger()
+
     SCICAT_API_URL = os.getenv("SCICAT_API_URL")
     SCICAT_INGEST_USER = os.getenv("SCICAT_INGEST_USER")
     SCICAT_INGEST_PASSWORD = os.getenv("SCICAT_INGEST_PASSWORD")
 
+    # files come in with the full pasth on the server that they
+    # were loaded from.
 
-    # files come in with the full pasth on the server that they 
-    # were loaded from. 
-    
     # relative path: raw/...
     # ingestor api maps /globa/cfs/cdirs/als/data_mover to /data_mover
     # so we want to prepend /data_mover/8.3.2
@@ -50,10 +51,40 @@ def ingest_dataset_task(file_path: str, ingestor_module: str):
     logger.info(
         f"Sending ingest job to {SCICAT_API_URL} for file {file_path}"
     )
-    scicat_client = from_credentials(
-        SCICAT_API_URL,
-        SCICAT_INGEST_USER,
-        SCICAT_INGEST_PASSWORD)
+    try:
+        scicat_client = from_credentials(
+            SCICAT_API_URL,
+            SCICAT_INGEST_USER,
+            SCICAT_INGEST_PASSWORD)
+    except Exception as e:
+        logger.warning(f"Failed to create SciCat client using pyscicat method: {e}")
+
+    # Note: the above method does not work with the current SciCat API (March 2025)
+    # The following method is used instead as a workaround, however, this will be udpated soon in pyscicat
+    # Ref: https://github.com/SciCatProject/pyscicat/pull/62
+    try:
+        import requests
+        from urllib.parse import urljoin
+
+        url = urljoin(SCICAT_API_URL, "auth/login")
+        logger.info(url)
+        response = requests.post(
+            url=url,
+            json={"username": SCICAT_INGEST_USER, "password": SCICAT_INGEST_PASSWORD},
+            stream=False,
+            verify=True,
+        )
+        logger.info(f"Login response: {response.json()}")
+        scicat_client = ScicatClient(SCICAT_API_URL, response.json()["access_token"])
+        logger.info("Logged in to SciCat.")
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to log in to SciCat: {e}")
+        raise e
+    except Exception as e:
+        logger.error(f"Failed to log in to SciCat: {e}")
+        raise e
+
     ingestor_module = importlib.import_module(ingestor_module)
     issues: List[Issue] = []
     new_dataset_id = ingestor_module.ingest(

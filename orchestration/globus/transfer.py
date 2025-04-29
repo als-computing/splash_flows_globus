@@ -132,9 +132,13 @@ def start_transfer(
     # if a transfer failed, like for a file not found globus keeps trying for a long time
     # and won't let another be attempted
     task_id = task["task_id"]
-    return task_wait(
+
+    success = task_wait(
         transfer_client, task_id, max_wait_seconds=max_wait_seconds, logger=logger
     )
+    
+    return success, task_id
+
 
 
 def is_globus_file_older(file_obj, older_than_days):

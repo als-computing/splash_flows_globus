@@ -1,15 +1,18 @@
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
 from enum import Enum
+import datetime
 import logging
 import os
 import time
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Optional
 
 import globus_sdk
 
 from orchestration.flows.bl832.config import Config832
+from orchestration.flows.bl832.job_controller import HPC
 from orchestration.globus.transfer import GlobusEndpoint, start_transfer
+from orchestration.prometheus_utils import PrometheusMetrics
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -111,17 +114,119 @@ class TransferController(Generic[Endpoint], ABC):
 
 
 class GlobusTransferController(TransferController[GlobusEndpoint]):
-    def __init__(
-        self,
-        config: Config832
-    ) -> None:
-        super().__init__(config)
     """
     Use Globus Transfer to move data between endpoints.
 
     Args:
         TransferController: Abstract class for transferring data.
     """
+    def __init__(
+        self,
+        config: Config832,
+        prometheus_metrics: Optional[PrometheusMetrics] = None
+    ) -> None:
+        super().__init__(config)
+        self.prometheus_metrics = prometheus_metrics
+
+    def get_transfer_file_info(
+        self,
+        task_id: str,
+        transfer_client: Optional[globus_sdk.TransferClient] = None
+    ) -> Optional[dict]:
+        """
+        Get information about a completed transfer from the Globus API.
+        
+        Args:
+            task_id (str): The Globus transfer task ID
+            transfer_client (TransferClient, optional): TransferClient instance
+            
+        Returns:
+            Optional[dict]: Task information including bytes_transferred, or None if unavailable
+        """
+        if transfer_client is None:
+            transfer_client = self.config.tc
+            
+        try:
+            task_info = transfer_client.get_task(task_id)
+            task_dict = task_info.data
+
+            if task_dict.get('status') == 'SUCCEEDED':
+                bytes_transferred = task_dict.get('bytes_transferred', 0) 
+                bytes_checksummed = task_dict.get('bytes_checksummed', 0)
+                files_transferred = task_dict.get('files_transferred', 0)
+                effective_bytes_per_second = task_dict.get('effective_bytes_per_second', 0)
+                return {
+                    'bytes_transferred': bytes_transferred,
+                    'bytes_checksummed': bytes_checksummed,
+                    'files_transferred': files_transferred,
+                    'effective_bytes_per_second': effective_bytes_per_second
+                }
+                
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting transfer task info: {e}")
+            return None
+    
+    def collect_and_push_metrics(
+        self,
+        start_time: float,
+        end_time: float,
+        file_path: str,
+        source: GlobusEndpoint,
+        destination: GlobusEndpoint,
+        file_size: int,
+        transfer_speed: float,
+        success: bool
+    ) -> None:
+        """
+        Collect transfer metrics and push them to Prometheus.
+        
+        Args:
+            start_time (float): Transfer start time as UNIX timestamp.
+            end_time (float): Transfer end time as UNIX timestamp.
+            file_path (str): The path of the transferred file.
+            source (GlobusEndpoint): The source endpoint.
+            destination (GlobusEndpoint): The destination endpoint.
+            file_size (int): Size of the transferred file in bytes.
+            transfer_speed (float): Transfer speed (bytes/second) provided by Globus
+            success (bool): Whether the transfer was successful.
+        """
+        try:
+            # Get machine_name
+            machine_name = destination.name
+
+            # Convert UNIX timestamps to ISO format strings
+            start_datetime = datetime.datetime.fromtimestamp(start_time, tz=datetime.timezone.utc)
+            end_datetime = datetime.datetime.fromtimestamp(end_time, tz=datetime.timezone.utc)
+            start_timestamp = start_datetime.isoformat()
+            end_timestamp = end_datetime.isoformat()
+            
+            # Calculate duration in seconds
+            duration_seconds = end_time - start_time
+            
+            # Calculate transfer speed (bytes per second)
+            # transfer_speed = file_size / duration_seconds if duration_seconds > 0 and file_size > 0 else 0
+
+            # Prepare metrics dictionary
+            metrics = {
+                "timestamp": start_timestamp,
+                "end_timestamp": end_timestamp,
+                "local_path": os.path.join(source.root_path, file_path),
+                "remote_path": os.path.join(destination.root_path, file_path),
+                "bytes_transferred": file_size,
+                "duration_seconds": duration_seconds,
+                "transfer_speed": transfer_speed,
+                "status": "success" if success else "failed",
+                "machine": machine_name
+            }
+            
+            # Push metrics to Prometheus
+            self.prometheus_metrics.push_metrics_to_prometheus(metrics, logger)
+            
+        except Exception as e:
+            logger.error(f"Error collecting or pushing metrics: {e}")
+    
     def copy(
         self,
         file_path: str = None,
@@ -135,22 +240,37 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
             file_path (str): The path of the file to copy.
             source (GlobusEndpoint): The source endpoint.
             destination (GlobusEndpoint): The destination endpoint.
-            transfer_client (TransferClient): The Globus transfer client.
+
+        Returns:
+            bool: True if the transfer was successful, False otherwise.
         """
+        
+        if not file_path:
+            logger.error("No file_path provided")
+            return False
+            
+        if not source or not destination:
+            logger.error("Source or destination endpoint not provided")
+            return False
 
         logger.info(f"Transferring {file_path} from {source.name} to {destination.name}")
 
+        # Remove leading slash if present
         if file_path[0] == "/":
             file_path = file_path[1:]
 
         source_path = os.path.join(source.root_path, file_path)
         dest_path = os.path.join(destination.root_path, file_path)
         logger.info(f"Transferring {source_path} to {dest_path}")
+
         # Start the timer
-        start_time = time.time()
+        transfer_start_time = time.time()
         success = False
+        task_id = None  # Initialize task_id here to prevent UnboundLocalError
+        file_size = 0   # Initialize file_size here as well
+        
         try:
-            success = start_transfer(
+            success, task_id = start_transfer(
                 transfer_client=self.config.tc,
                 source_endpoint=source,
                 source_path=source_path,
@@ -159,18 +279,41 @@ class GlobusTransferController(TransferController[GlobusEndpoint]):
                 max_wait_seconds=600,
                 logger=logger,
             )
+
             if success:
                 logger.info("Transfer completed successfully.")
             else:
                 logger.error("Transfer failed.")
-            return success
+                
         except globus_sdk.services.transfer.errors.TransferAPIError as e:
             logger.error(f"Failed to submit transfer: {e}")
-            return success
+            
         finally:
             # Stop the timer and calculate the duration
-            elapsed_time = time.time() - start_time
-            logger.info(f"Transfer process took {elapsed_time:.2f} seconds.")
+            transfer_end_time = time.time()
+
+            # Try to get transfer info from the completed task
+            if task_id:
+                transfer_info = self.get_transfer_file_info(task_id)
+                if transfer_info:
+                    file_size = transfer_info.get('bytes_transferred', 0)
+                    transfer_speed = transfer_info.get('effective_bytes_per_second', 0)
+                    logger.info(f"Globus Task Info: Transferred {file_size} bytes ")
+                    logger.info(f"Globus Task Info: Effective speed: {transfer_speed} bytes/second")
+            
+            # Collect and push metrics if enabled
+            if self.prometheus_metrics and file_size > 0:
+                self.collect_and_push_metrics(
+                    start_time=transfer_start_time,
+                    end_time=transfer_end_time,
+                    file_path=file_path,
+                    source=source,
+                    destination=destination,
+                    file_size=file_size,
+                    transfer_speed=transfer_speed,
+                    success=success,
+                )
+                
             return success
 
 
@@ -248,7 +391,8 @@ class CopyMethod(Enum):
 
 def get_transfer_controller(
     transfer_type: CopyMethod,
-    config: Config832
+    config: Config832,
+    prometheus_metrics: Optional[PrometheusMetrics] = None
 ) -> TransferController:
     """
     Get the appropriate transfer controller based on the transfer type.
@@ -261,7 +405,7 @@ def get_transfer_controller(
         TransferController: The transfer controller object.
     """
     if transfer_type == CopyMethod.GLOBUS:
-        return GlobusTransferController(config)
+        return GlobusTransferController(config, prometheus_metrics)
     elif transfer_type == CopyMethod.SIMPLE:
         return SimpleTransferController(config)
     else:
