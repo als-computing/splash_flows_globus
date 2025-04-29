@@ -74,7 +74,7 @@ def ingest_dataset_task(file_path: str, ingestor_module: str):
             stream=False,
             verify=True,
         )
-        logger.info(f"Login response: {response.json()}")
+        # logger.info(f"Login response: {response.json()}")
         scicat_client = ScicatClient(SCICAT_API_URL, response.json()["access_token"])
         logger.info("Logged in to SciCat.")
 
