@@ -10,6 +10,7 @@ mkdocs-material
 mkdocs-mermaid2-plugin
 numpy>=1.26.4
 pillow
+pydantic==2.11
 pytest_mock
 python-dotenv
 prefect==2.19.5
