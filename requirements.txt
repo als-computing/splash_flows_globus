@@ -8,7 +8,7 @@ httpx>=0.22.0
 mkdocs
 mkdocs-material
 mkdocs-mermaid2-plugin
-numpy==1.23.2
+numpy>=1.26.4
 pillow
 pytest_mock
 python-dotenv
